@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "c2uV9aCBD3FFKbj-4AKA7"
+uri = "file://README.md"
+type = "text"
+title = "README — Compliance & AMC Management System"
