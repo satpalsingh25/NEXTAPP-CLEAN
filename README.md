@@ -681,13 +681,19 @@ npm install
 # 2. Generate Prisma client
 npx prisma generate
 
-# 3. Push schema to the database (safe — does not drop existing data)
+# 3. Create .env in root folder
+DATABASE_URL=postgresql://postgres:Secret@localhost:5432/DBNAME
+JWT_SECRET="1f0fff24cd1b41cd723de8e43ce0be1627ae4024b61d485df08e035caf5315e5"
+
+To Generate: JWT_SECRET > node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# 4. Push schema to the database (safe — does not drop existing data)
 npx prisma db push
 
-# 4. Build the Next.js app
+# 5. Build the Next.js app
 npm run build
 
-# 5. Start the production server (port 5000)
+# 6. Start the production server (port 5000)
 npm run start
 ```
 
