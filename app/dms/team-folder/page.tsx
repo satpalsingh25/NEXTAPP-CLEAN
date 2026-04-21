@@ -986,12 +986,12 @@ function FilePreviewModal({ file, onClose }: { file: DmsFile; onClose: () => voi
         </div>
         <div className="flex-1 overflow-auto bg-slate-50 min-h-0">
           {kind === "pdf" && (
-            <iframe src={proxyUrl(file.id)} title={file.name} className="w-full h-full min-h-[70vh]" data-testid="iframe-pdf-preview"/>
+            <iframe src={`/api/dms/file-preview?id=${file.id}`} title={file.name} className="w-full h-full min-h-[70vh]" data-testid="iframe-pdf-preview"/>
           )}
           {kind === "image" && (
             <div className="flex items-center justify-center p-6 h-full min-h-[60vh]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={proxyUrl(file.id)} alt={file.name} className="max-w-full max-h-[75vh] rounded-lg object-contain shadow" data-testid="img-file-preview"/>
+              <img src={`/api/dms/file-preview?id=${file.id}`} alt={file.name} className="max-w-full max-h-[75vh] rounded-lg object-contain shadow" data-testid="img-file-preview"/>
             </div>
           )}
           {kind === "unsupported" && (

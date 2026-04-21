@@ -1,0 +1,122 @@
+Implement file preview system for DMS.
+
+----------------------------------------
+BACKEND
+----------------------------------------
+
+Create API:
+
+GET /api/dms/file-preview?id={fileId}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+1. Fetch file:
+
+const file = await prisma.dmsDocument.findUnique({ where: { id } })
+
+2. Permission check
+
+3. Get file stream from SharePoint
+
+4. Set headers:
+
+res.setHeader("Content-Type", file.mime_type)
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ DO NOT force download
+✔ Stream file inline
+
+----------------------------------------
+FRONTEND
+----------------------------------------
+
+----------------------------------------
+SUPPORTED TYPES
+----------------------------------------
+
+Preview inline if:
+
+✔ PDF → application/pdf
+✔ Images → image/jpeg, image/png, image/webp
+
+Else → fallback
+
+----------------------------------------
+UI
+----------------------------------------
+
+Add:
+
+Double-click file OR right-click → View
+
+----------------------------------------
+OPEN MODAL
+----------------------------------------
+
+Modal:
+
+----------------------------------------
+CASE 1: PDF
+----------------------------------------
+
+Use iframe:
+
+<iframe src="/api/dms/file-preview?id=FILE_ID" />
+
+----------------------------------------
+CASE 2: IMAGE
+----------------------------------------
+
+<img src="/api/dms/file-preview?id=FILE_ID" />
+
+----------------------------------------
+CASE 3: OTHER FILE
+----------------------------------------
+
+Show message:
+
+"This file cannot be previewed"
+
+Button:
+[ Download ]
+
+----------------------------------------
+DOWNLOAD BUTTON
+----------------------------------------
+
+Call existing download API
+
+----------------------------------------
+MODAL DESIGN
+----------------------------------------
+
+✔ Full screen modal
+✔ Close button (X)
+✔ File name on top
+
+----------------------------------------
+SECURITY
+----------------------------------------
+
+✔ Only authenticated users
+✔ Respect permissions
+
+----------------------------------------
+PERFORMANCE
+----------------------------------------
+
+✔ Stream file
+✔ Do not buffer full file
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Upload logic
+• SharePoint logic
+• Download logic
