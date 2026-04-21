@@ -597,6 +597,7 @@ export default function DmsMyFilesPage() {
   const [selectedKind, setSelectedKind] = useState<Record<string, "folder" | "file">>({});
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkError,    setBulkError]    = useState("");
+  const [isZipping,    setIsZipping]    = useState(false);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const uploadFolderRef = useRef<string | null>(null); // target folder for context-menu upload
@@ -723,15 +724,43 @@ export default function DmsMyFilesPage() {
     if (currentFolderId) loadContents(currentFolderId);
   }
 
-  function handleDownloadSelected() {
-    for (const id of selectedIds) {
-      if (selectedKind[id] === "file") {
-        const a = document.createElement("a");
-        a.href = proxyUrl(id, true);
-        a.click();
+  async function handleDownloadSelected() {
+    if (selectedIds.size === 0 || isZipping) return;
+    setIsZipping(true);
+    try {
+      const ids  = Array.from(selectedIds);
+      const type = ids.every((id) => selectedKind[id] === "file")
+        ? "file"
+        : ids.every((id) => selectedKind[id] === "folder")
+        ? "folder"
+        : "mixed";
+
+      const res = await fetch("/api/dms/download-zip", {
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ ids, type }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({})) as { error?: string };
+        setBulkError(j.error ?? "Failed to prepare download.");
+        return;
       }
+
+      const blob    = await res.blob();
+      const url     = URL.createObjectURL(blob);
+      const anchor  = document.createElement("a");
+      anchor.href   = url;
+      anchor.download = "download.zip";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      clearSelection();
+    } catch {
+      setBulkError("Network error. Please try again.");
+    } finally {
+      setIsZipping(false);
     }
-    clearSelection();
   }
 
   /* ── navigate ── */
@@ -1037,10 +1066,14 @@ export default function DmsMyFilesPage() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={handleDownloadSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors"
+              disabled={isZipping}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               data-testid="btn-download-selected"
             >
-              <Download size={14}/> Download Files
+              {isZipping
+                ? <><Loader2 size={14} className="animate-spin"/> Preparing…</>
+                : <><Download size={14}/> Download as ZIP</>
+              }
             </button>
             <button
               onClick={handleDeleteSelected}

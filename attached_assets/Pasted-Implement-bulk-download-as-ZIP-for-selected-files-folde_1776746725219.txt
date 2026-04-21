@@ -1,0 +1,142 @@
+Implement bulk download as ZIP for selected files/folders in DMS.
+
+----------------------------------------
+BACKEND
+----------------------------------------
+
+Create API:
+
+POST /api/dms/download-zip
+
+Body:
+{
+  ids: string[],        // file or folder IDs
+  type: "file" | "folder" | "mixed"
+}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+1. Fetch records:
+
+• If file → prisma.dmsDocument
+• If folder → prisma.dmsFolder (recursive fetch)
+
+----------------------------------------
+RECURSIVE FOLDER FETCH
+----------------------------------------
+
+For folder:
+→ get all subfolders
+→ get all files inside
+
+----------------------------------------
+ZIP CREATION
+----------------------------------------
+
+Use library:
+
+npm install archiver
+
+----------------------------------------
+IMPLEMENT
+----------------------------------------
+
+import archiver
+
+const archive = archiver('zip', { zlib: { level: 9 } })
+
+Set headers:
+
+res.setHeader('Content-Type', 'application/zip')
+res.setHeader('Content-Disposition', 'attachment; filename=files.zip')
+
+archive.pipe(res)
+
+----------------------------------------
+ADD FILES TO ZIP
+----------------------------------------
+
+For each file:
+
+1. Get file stream from SharePoint
+   (use existing download logic)
+
+2. Add to archive:
+
+archive.append(fileStream, {
+  name: "FolderName/FileName.pdf"
+})
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Maintain folder structure
+✔ Do NOT load full file into memory
+✔ Use streams
+
+----------------------------------------
+FINALIZE
+----------------------------------------
+
+archive.finalize()
+
+----------------------------------------
+FRONTEND
+----------------------------------------
+
+1. Enable multi-select
+
+• checkbox OR ctrl+click
+
+----------------------------------------
+STATE
+----------------------------------------
+
+const [selectedIds, setSelectedIds]
+
+----------------------------------------
+BUTTON
+----------------------------------------
+
+Show:
+
+[ Download Selected ]
+
+----------------------------------------
+ON CLICK
+----------------------------------------
+
+Call:
+
+POST /api/dms/download-zip
+
+----------------------------------------
+DOWNLOAD RESPONSE
+----------------------------------------
+
+Use:
+
+window.location or blob download
+
+----------------------------------------
+UI BEHAVIOR
+----------------------------------------
+
+✔ Disable button if nothing selected
+✔ Show "Preparing download..."
+
+----------------------------------------
+LIMIT
+----------------------------------------
+
+✔ Max 100 files (for now)
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Existing single file download
+• SharePoint integration
