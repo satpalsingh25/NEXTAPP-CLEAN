@@ -13,9 +13,13 @@ export default function Header() {
 
   const hasLogo  = !!branding.logo_base64;
   const logoSrc  = branding.logo_base64 ?? "";
+  const appName  = branding.app_name || "Compliance & AMC";
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-8 sticky top-0 z-10">
+    <header
+      className="h-16 flex items-center justify-between px-8 sticky top-0 z-10 border-b"
+      style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}
+    >
       <div className="hidden md:flex items-center gap-3">
         {hasLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -26,10 +30,10 @@ export default function Header() {
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         ) : (
-          <span className="text-slate-500 dark:text-slate-300 text-sm">Compliance &amp; AMC Management</span>
+          <span className="text-sm" style={{ color: "var(--muted)" }}>{appName}</span>
         )}
       </div>
-      <div className="md:hidden font-bold text-slate-900 dark:text-slate-100">AMC System</div>
+      <div className="md:hidden font-bold" style={{ color: "var(--text)" }}>{appName}</div>
 
       <div className="flex items-center space-x-3">
         <a href="/dashboard" className="mr-2 text-sm text-slate-700 hover:text-slate-900 transition-colors">Dashboard</a>

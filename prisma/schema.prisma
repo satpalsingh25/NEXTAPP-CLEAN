@@ -72,7 +72,15 @@ model Branding {
   id              String   @id @default(uuid()) @db.Uuid
   company_id      String   @unique @db.Uuid
 
+  app_name        String?
+  browser_title   String?
+
   logo_base64     String?  @db.Text
+
+  login_banner    String?  @db.Text
+  login_footer    String?  @db.Text
+  login_bg        String?  @db.Text
+
   primary_color   String?
   secondary_color String?
 

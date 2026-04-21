@@ -11,7 +11,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-slate-50 antialiased text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors">
+      <body className="antialiased">
         <AuthProvider>
           <BrandingProvider>
             <ClientLayout>

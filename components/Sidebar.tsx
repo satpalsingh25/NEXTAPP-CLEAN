@@ -28,6 +28,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext";
 
 type NavChild = {
   name: string;
@@ -141,6 +142,7 @@ export default function Sidebar() {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
   const { user }     = useAuth();
+  const { branding } = useBranding();
   const role         = user?.role ?? "USER";
   const can          = useMemo(() => buildPermissions(role), [role]);
 
@@ -212,7 +214,7 @@ export default function Sidebar() {
   return (
     <aside className="w-60 bg-slate-900 text-slate-100 h-screen sticky top-0 hidden md:flex flex-col border-r border-slate-800 shrink-0">
       <div className="h-14 flex items-center px-5 border-b border-slate-800">
-        <span className="font-bold text-base tracking-tight text-white">Compliance & AMC</span>
+        <span className="font-bold text-base tracking-tight text-white truncate">{branding.app_name || "Compliance & AMC"}</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
