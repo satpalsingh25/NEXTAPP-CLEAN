@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Building2, Users, Plus, X, ShieldCheck, Globe, Pencil, Layers,
-  ChevronRight, PowerOff, Trash2, AlertTriangle, Power, Boxes, Check } from "lucide-react";
+  ChevronRight, PowerOff, Trash2, AlertTriangle, Power, Boxes, Check,
+  Palette, Image as ImageIcon, Sun, Moon, Upload } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface Country { id: string; name: string }
@@ -33,9 +34,19 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+interface Branding {
+  id?:              string;
+  company_id?:      string;
+  logo_url?:        string | null;
+  primary_color?:   string | null;
+  secondary_color?: string | null;
+  theme_mode?:      "light" | "dark";
+}
+
 export default function CompaniesPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const canBrand     = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
@@ -83,6 +94,84 @@ export default function CompaniesPage() {
 
   const toggleModule = (id: string) =>
     setModuleRows((rows) => rows.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+
+  /* ── Branding Settings ─────────────────────────────────────────── */
+  const [showBranding, setShowBranding]     = useState(false);
+  const [branding, setBranding]             = useState<Branding | null>(null);
+  const [logoPreview, setLogoPreview]       = useState<string | null>(null);
+  const [brandingLoading, setBrandingLoading] = useState(false);
+  const [brandingSaving,  setBrandingSaving]  = useState(false);
+  const [logoUploading,   setLogoUploading]   = useState(false);
+  const [brandingError,   setBrandingError]   = useState("");
+  const [brandingToast,   setBrandingToast]   = useState("");
+
+  const openBranding = async () => {
+    setShowBranding(true);
+    setBrandingError("");
+    setLogoPreview(null);
+    setBranding(null);
+    setBrandingLoading(true);
+    try {
+      const res = await fetch("/api/branding");
+      if (!res.ok) throw new Error("Failed to load branding");
+      const data: Branding = await res.json();
+      setBranding(data);
+      setLogoPreview(data.logo_url ?? null);
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to load branding");
+    } finally {
+      setBrandingLoading(false);
+    }
+  };
+
+  const onLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !branding) return;
+
+    setBrandingError("");
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res  = await fetch("/api/branding/upload-logo", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setBranding({ ...branding, logo_url: data.logo_url });
+      setLogoPreview(data.logo_url);
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const saveBranding = async () => {
+    if (!branding) return;
+    setBrandingSaving(true);
+    setBrandingError("");
+    try {
+      const res = await fetch("/api/branding", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          logo_url:        branding.logo_url        ?? null,
+          primary_color:   branding.primary_color   ?? null,
+          secondary_color: branding.secondary_color ?? null,
+          theme_mode:      branding.theme_mode      ?? "light",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Save failed");
+      setShowBranding(false);
+      setBrandingToast("Branding updated");
+      setTimeout(() => setBrandingToast(""), 2500);
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBrandingSaving(false);
+    }
+  };
 
   const saveModules = async () => {
     if (!modulesCo) return;
@@ -183,13 +272,22 @@ export default function CompaniesPage() {
             <Layers size={13} className="text-slate-400" /> Department
           </p>
         </div>
-        {isSuperAdmin && (
-          <button onClick={() => { setShowCreate(true); setCName(""); setCCountry(""); }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
-            data-testid="btn-new-company">
-            <Plus size={15} /> New Company
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canBrand && (
+            <button onClick={openBranding}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+              data-testid="btn-branding-settings">
+              <Palette size={15} /> Branding Settings
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button onClick={() => { setShowCreate(true); setCName(""); setCCountry(""); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+              data-testid="btn-new-company">
+              <Plus size={15} /> New Company
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -406,6 +504,147 @@ export default function CompaniesPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Branding Settings Modal */}
+      {showBranding && (
+        <Modal title="Branding Settings" onClose={() => !brandingSaving && !logoUploading && setShowBranding(false)}>
+          {brandingLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
+            </div>
+          ) : !branding ? (
+            <p className="text-sm text-rose-600 text-center py-4">{brandingError || "Could not load branding."}</p>
+          ) : (
+            <div className="space-y-5">
+              {/* SECTION 1 — LOGO */}
+              <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <ImageIcon size={13} /> Logo
+                </h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-24 h-24 shrink-0 rounded-xl border border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden">
+                    {logoPreview ? (
+                      // Proxy may not exist yet for SharePoint paths — falls back to icon on error
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={logoPreview}
+                        alt="Logo"
+                        className="object-contain w-full h-full"
+                        onError={(e) => { (e.currentTarget.style.display = "none"); }}
+                      />
+                    ) : (
+                      <ImageIcon size={26} className="text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <label className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg cursor-pointer transition-colors ${
+                      logoUploading ? "bg-slate-200 text-slate-400 cursor-wait" : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}>
+                      <Upload size={14} />
+                      {logoUploading ? "Uploading…" : (logoPreview ? "Replace Logo" : "Upload Logo")}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={logoUploading}
+                        onChange={onLogoChange}
+                        data-testid="input-logo-file"
+                      />
+                    </label>
+                    <p className="text-xs text-slate-500">PNG, JPEG, or WebP.</p>
+                    {logoPreview && (
+                      <p className="text-[11px] text-slate-400 break-all" title={logoPreview}>{logoPreview}</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* SECTION 2 — THEME MODE */}
+              <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Theme Mode</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["light", "dark"] as const).map((mode) => {
+                    const active = (branding.theme_mode ?? "light") === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setBranding({ ...branding, theme_mode: mode })}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
+                          active
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                        }`}
+                        data-testid={`btn-theme-${mode}`}
+                      >
+                        {mode === "light" ? <Sun size={14} /> : <Moon size={14} />}
+                        {mode === "light" ? "Light" : "Dark"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* SECTION 3 — COLORS (read-only display) */}
+              <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Colors</h3>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-500 mb-1">Primary</p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-7 h-7 rounded-md border border-slate-200"
+                        style={{ background: branding.primary_color || "#e2e8f0" }}
+                      />
+                      <span className="font-mono text-slate-700">{branding.primary_color || "—"}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 mb-1">Secondary</p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-7 h-7 rounded-md border border-slate-200"
+                        style={{ background: branding.secondary_color || "#e2e8f0" }}
+                      />
+                      <span className="font-mono text-slate-700">{branding.secondary_color || "—"}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">Color picker coming soon.</p>
+              </section>
+
+              {brandingError && (
+                <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{brandingError}</p>
+              )}
+
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => setShowBranding(false)}
+                  disabled={brandingSaving || logoUploading}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveBranding}
+                  disabled={brandingSaving || logoUploading}
+                  className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  data-testid="btn-save-branding"
+                >
+                  {brandingSaving ? "Saving…" : "Save Settings"}
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Branding update toast */}
+      {brandingToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg">
+          <Check size={15} /> {brandingToast}
+        </div>
       )}
 
       {/* Manage Modules Modal */}
