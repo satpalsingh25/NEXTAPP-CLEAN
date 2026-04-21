@@ -92,6 +92,7 @@ instrumentation.ts      Runs seed on startup (Node.js runtime only)
 | `/api/compliance/[id]/approve` | POST | APPROVER+ | Approve current level |
 | `/api/compliance/[id]/reject` | POST | APPROVER+ | Reject |
 | `/api/compliance/[id]/resubmit` | POST | SUBMIT_ROLES | Resubmit after rejection |
+| `/api/compliance/[id]/upload` | POST | Any | Upload evidence file(s) — multipart, uses central storage service |
 | `/api/compliance/approval-matrix` | GET | ADMIN | List all records with matrix status |
 | `/api/compliance/[id]/approval-matrix` | GET/POST | ADMIN | Get/set per-record matrix |
 | `/api/compliance/templates` | GET/POST | MANAGER+ | Template CRUD |
@@ -136,6 +137,7 @@ Fully independent from Compliance — separate tables, APIs, and UI. Same workfl
 | `/api/amc/[id]/approve` | POST | APPROVER+ | Approve |
 | `/api/amc/[id]/reject` | POST | APPROVER+ | Reject |
 | `/api/amc/[id]/resubmit` | POST | SUBMIT_ROLES | Resubmit |
+| `/api/amc/[id]/upload` | POST | Any | Upload evidence file(s) — multipart, uses central storage service |
 | `/api/amc/approval-matrix` | GET | ADMIN | List all AMC records with matrix status |
 | `/api/amc/[id]/approval-matrix` | GET/POST | ADMIN | Get/set per-record matrix |
 | `/api/amc/approvals` | GET | APPROVER+ | Approver inbox (current-level only) |
@@ -262,6 +264,8 @@ Flags: `can_read`, `can_upload`, `can_write`, `can_delete`
 | `/api/dms/file` | GET | Stream file from SharePoint (proxy) |
 | `/api/dms/file` | DELETE | Delete file + SharePoint item |
 | `/api/dms/upload` | POST | Upload one or more files to SharePoint |
+| `/api/dms/file-preview` | GET | Inline-stream a file (PDF/image) for preview modal — auth + permission enforced |
+| `/api/dms/download-zip` | POST | Bulk-download selected files/folders as a streamed ZIP (recursive, 100-file cap) |
 | `/api/dms/folder-access` | GET | Return `can_read/upload/write/delete` for a folder |
 | `/api/dms/user-settings` | GET | Return DMS settings (`allow_user_folder_creation`) |
 | `/api/admin/dms-sync` | POST | Sync SharePoint folder tree into DB |
@@ -273,6 +277,61 @@ Flags: `can_read`, `can_upload`, `can_write`, `can_delete`
 | `DmsFolder` | Folder records with `path`, `type` (`COMPANY`/`TEAM`/`USER`), `parent_id`, `company_id` |
 | `DmsDocument` | File metadata — `name`, `file_url`, `folder_path`, `sharepoint_item_id`, `drive_id`, `company_id` |
 | `FolderPermission` | Per-folder ACL rows linking users/groups to `can_read/upload/write/delete` flags |
+
+---
+
+## Central Storage Service (`lib/storage.ts`)
+
+Single entry point for **all** SharePoint file uploads across DMS, Compliance, and AMC. Replaces ad-hoc `fetch` calls scattered across module routes.
+
+### `uploadFile(input)`
+
+```ts
+const result = await uploadFile({
+  file,                          // Web API File
+  fileName,                      // explicit name (may differ from file.name)
+  mimeType,                      // e.g. "application/pdf"
+  company_id,
+  user_id,
+  module:    "DMS" | "AMC" | "COMPLIANCE",
+  record_id?: string,            // required for AMC and COMPLIANCE
+  parent_path?: string,          // DMS only — DmsFolder.path of target
+});
+// → { name, path, mimeType, size, sharePointItemId, webUrl }
+```
+
+### Path Construction
+
+Names are **slugified** (whitespace → `_`, special chars stripped) — never raw UUIDs.
+
+| Module | SharePoint path |
+|---|---|
+| DMS (with `parent_path`) | `/Company/{co_slug}/{parent_path}/{filename}` |
+| DMS (My Files root) | `/Company/{co_slug}/Users/{user_slug}/{filename}` |
+| COMPLIANCE | `/Company/{co_slug}/Compliance/{record_id}/{filename}` |
+| AMC | `/Company/{co_slug}/AMC/{record_id}/{filename}` |
+
+Examples: `/Company/ABC_Ltd/Users/Satpal/Invoice.pdf` · `/Company/ABC_Ltd/Compliance/1234/report.pdf`
+
+### Base Folder Bootstrap
+
+Before each upload, `ensureSharePointFolder()` is called sequentially for the base tree (parent before child) so the structure exists in SharePoint:
+
+```
+Company/
+Company/{co_slug}/
+Company/{co_slug}/{Users,TeamFolder,Compliance,AMC}/
+```
+
+`GET` first; on 404 a `POST` with `conflictBehavior: "replace"` creates it (race-safe). Non-404 errors are warned but not fatal — the upload PUT will surface real failures.
+
+### Module-Specific Upload Endpoints
+
+- **DMS** (`/api/dms/upload`) — keeps its own logic (DMS settings validation, folder permissions, `DmsDocument` row, activity log) but constructs paths via the central service contract
+- **Compliance** (`/api/compliance/[id]/upload`) — multipart, validates record + tenant, loops files, persists each as `Document { module: "COMPLIANCE", record_id, file_path, ... }`
+- **AMC** (`/api/amc/[id]/upload`) — same shape as compliance, with `module: "AMC"`
+
+Compliance and AMC uploads **never** create DMS folder entries or check DMS permissions.
 
 ---
 
