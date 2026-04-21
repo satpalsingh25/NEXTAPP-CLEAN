@@ -72,7 +72,7 @@ model Branding {
   id              String   @id @default(uuid()) @db.Uuid
   company_id      String   @unique @db.Uuid
 
-  logo_url        String?
+  logo_base64     String?  @db.Text
   primary_color   String?
   secondary_color String?
 

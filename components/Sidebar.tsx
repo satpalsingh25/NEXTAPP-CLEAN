@@ -99,8 +99,8 @@ const ALL_MODULES: NavModule[] = [
       { name: "Countries",     href: "/admin/countries",    icon: Globe },
 
       /* ── Company Settings group ── */
-      { name: "General",              href: "/admin/companies",  icon: Building2, perm: "super_admin", group: "Company Settings" },
-      { name: "Branding",             href: "/admin/companies",  icon: Building2, perm: "super_admin", group: "Company Settings" },
+      { name: "General",              href: "/admin/companies",                       icon: Building2, perm: "super_admin", group: "Company Settings" },
+      { name: "Branding",             href: "/admin/company-settings/branding",       icon: Building2,                      group: "Company Settings" },
       { name: "SharePoint Settings",  href: "/admin/sharepoint", icon: Cloud,                          group: "Company Settings" },
       { name: "DMS Settings",         href: "/admin/dms-settings", icon: HardDrive,                    group: "Company Settings" },
 

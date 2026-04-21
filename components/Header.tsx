@@ -11,8 +11,8 @@ export default function Header() {
   const { user, loading, logout } = useAuth();
   const { branding } = useBranding();
 
-  const hasLogo  = !!branding.logo_url;
-  const logoSrc  = branding.logo_url ?? "";
+  const hasLogo  = !!branding.logo_base64;
+  const logoSrc  = branding.logo_base64 ?? "";
 
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-8 sticky top-0 z-10">

@@ -4,14 +4,14 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { useAuth } from "@/context/AuthContext";
 
 export interface Branding {
-  logo_url:        string | null;
+  logo_base64:     string | null;
   primary_color:   string | null;
   secondary_color: string | null;
   theme_mode:      "light" | "dark";
 }
 
 const DEFAULT: Branding = {
-  logo_url:        null,
+  logo_base64:     null,
   primary_color:   "#2563eb",
   secondary_color: "#2563eb",
   theme_mode:      "light",
@@ -65,7 +65,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return;
       const data = await res.json();
       setBranding({
-        logo_url:        data.logo_url        ?? null,
+        logo_base64:     data.logo_base64     ?? null,
         primary_color:   data.primary_color   ?? DEFAULT.primary_color,
         secondary_color: data.secondary_color ?? DEFAULT.secondary_color,
         theme_mode:      data.theme_mode === "dark" ? "dark" : "light",
