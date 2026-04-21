@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
 import { uploadFile }               from "@/lib/storage";
 import { requireRole }              from "@/lib/auth.server";
+import { extractPrimaryColorFromBuffer } from "@/lib/color-extract";
 
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"] as const;
 
@@ -62,15 +63,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
+  /* ── Extract dominant color (non-blocking, always falls back) ──── */
+  let primaryColor: string | null = null;
+  try {
+    const buf    = Buffer.from(await file.arrayBuffer());
+    primaryColor = await extractPrimaryColorFromBuffer(buf);
+  } catch {
+    // Swallow — color is a best-effort enhancement, never blocks upload.
+    primaryColor = null;
+  }
+
   /* ── Persist on Branding row ───────────────────────────────────── */
   const branding = await prisma.branding.upsert({
     where:  { company_id },
-    update: { logo_url: result.path },
-    create: { company_id, logo_url: result.path },
+    update: {
+      logo_url: result.path,
+      ...(primaryColor ? { primary_color: primaryColor, secondary_color: primaryColor } : {}),
+    },
+    create: {
+      company_id,
+      logo_url:        result.path,
+      primary_color:   primaryColor,
+      secondary_color: primaryColor,
+    },
   });
 
   return NextResponse.json({
-    success:  true,
-    logo_url: branding.logo_url,
+    success:         true,
+    logo_url:        branding.logo_url,
+    primary_color:   branding.primary_color,
+    secondary_color: branding.secondary_color,
   });
 }
