@@ -1,0 +1,140 @@
+Implement rename functionality for DMS folders and files with SharePoint sync.
+
+----------------------------------------
+BACKEND
+----------------------------------------
+
+Create API:
+
+PATCH /api/dms/rename
+
+Body:
+{
+  id: string,
+  type: "folder" | "file",
+  new_name: string
+}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+1. Validate:
+   • new_name not empty
+   • no special characters (/ \ ? % * : | " < >)
+
+2. Fetch record:
+
+IF type = folder:
+  const folder = await prisma.dmsFolder.findUnique({ where: { id } })
+
+IF type = file:
+  const file = await prisma.dmsDocument.findUnique({ where: { id } })
+
+3. Permission check:
+   • User must have EDIT permission OR be owner
+
+4. Build SharePoint path:
+
+• Get full current path (recursive parent)
+• oldPath = /Company/.../OldName
+• newPath = /Company/.../NewName
+
+----------------------------------------
+SHAREPOINT ACTION
+----------------------------------------
+
+Use MOVE operation (not delete + create)
+
+• Rename Folder:
+  PATCH /drive/items/{item-id}
+  body:
+  {
+    "name": new_name
+  }
+
+• Rename File:
+  Same API (rename = update name)
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Do NOT re-upload file
+✔ Do NOT change folder structure
+✔ Only rename
+
+----------------------------------------
+DB UPDATE
+----------------------------------------
+
+Update:
+
+name = new_name
+updated_at = now()
+
+----------------------------------------
+RESPONSE
+----------------------------------------
+
+return { success: true }
+
+----------------------------------------
+FRONTEND
+----------------------------------------
+
+1. Add "Rename" in right-click menu
+
+2. On click:
+   • Open modal
+
+----------------------------------------
+MODAL
+----------------------------------------
+
+Title: Rename
+
+Input:
+[ current_name ]
+
+Buttons:
+[ Cancel ] [ Save ]
+
+----------------------------------------
+ON SAVE
+----------------------------------------
+
+Call:
+
+PATCH /api/dms/rename
+
+----------------------------------------
+REFRESH
+----------------------------------------
+
+After success:
+• reload current folder
+
+----------------------------------------
+VALIDATION
+----------------------------------------
+
+✔ Prevent same name
+✔ Prevent empty name
+
+----------------------------------------
+UI BEHAVIOR
+----------------------------------------
+
+✔ Rename reflects immediately
+✔ Works for:
+   • My Files
+   • Team Folder
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Upload logic
+• Permissions model
+• SharePoint structure

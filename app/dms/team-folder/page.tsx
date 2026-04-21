@@ -721,12 +721,11 @@ function RenameModal({
   async function handleSave() {
     if (!name.trim() || name.trim() === current.name) { onClose(); return; }
     setLoading(true); setError("");
-    const url = kind === "folder" ? `/api/dms/folders/${current.id}` : `/api/dms/files/${current.id}`;
     try {
-      const res  = await fetch(url, {
+      const res  = await fetch("/api/dms/rename", {
         method: "PATCH", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ id: current.id, type: kind, new_name: name.trim() }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "Rename failed."); return; }
