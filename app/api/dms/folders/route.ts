@@ -5,7 +5,27 @@ import { createFolder } from "@/lib/sharepoint-check";
 import { ensureCompanyRootFolder } from "@/lib/dms-company-root";
 import { buildFolderPath } from "@/lib/dms-folder-path";
 
-/* GET /api/dms/folders?parent_id=<uuid>  — list subfolders */
+/* Build breadcrumb trail by walking up the parent chain */
+async function buildBreadcrumbs(
+  folderId: string,
+): Promise<{ id: string; name: string }[]> {
+  const crumbs: { id: string; name: string }[] = [];
+  let currentId: string | null = folderId;
+  while (currentId) {
+    const folder = await prisma.dmsFolder.findUnique({
+      where:  { id: currentId },
+      select: { id: true, name: true, parent_id: true },
+    });
+    if (!folder) break;
+    crumbs.unshift({ id: folder.id, name: folder.name });
+    currentId = folder.parent_id;
+  }
+  return crumbs;
+}
+
+/* GET /api/dms/folders?parent_id=<uuid>
+   Returns { currentFolder, breadcrumbs, folders, files }
+   If parent_id is omitted, returns a stub with Root breadcrumb. */
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
@@ -13,38 +33,61 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const parent_id = searchParams.get("parent_id");
+
+  /* ── No parent_id: return Root stub ── */
   if (!parent_id) {
-    return NextResponse.json({ error: "parent_id is required." }, { status: 400 });
+    return NextResponse.json({
+      currentFolder: null,
+      breadcrumbs:   [{ id: null, name: "Root" }],
+      folders:       [],
+      files:         [],
+    });
   }
 
   const parent = await prisma.dmsFolder.findUnique({
     where:  { id: parent_id },
-    select: { company_id: true, type: true },
+    select: { id: true, name: true, path: true, type: true, created_at: true, company_id: true },
   });
   if (!parent)                          return NextResponse.json({ error: "Folder not found." }, { status: 404 });
   if (parent.company_id !== company_id) return NextResponse.json({ error: "Access denied." },   { status: 403 });
 
-  /* ── USER-type parent: return only folders owned by the current user ──
-     USER folders are personal and have no FolderPermission records,
-     so permission-based filtering must not be applied here.             */
+  /* ── Build breadcrumbs ── */
+  const breadcrumbs = await buildBreadcrumbs(parent_id);
+
+  /* ── Fetch child folders ── */
+  let folders;
   if (parent.type === "USER") {
-    const folders = await prisma.dmsFolder.findMany({
+    /* USER folders are personal — return only folders owned by this user */
+    folders = await prisma.dmsFolder.findMany({
       where:   { company_id, parent_id, type: "USER", created_by: user_id },
       orderBy: { name: "asc" },
       select:  { id: true, name: true, path: true, type: true, created_at: true },
     });
-    return NextResponse.json(folders);
+  } else {
+    /* TEAM folders — permission filtering handled client-side / dedicated routes */
+    folders = await prisma.dmsFolder.findMany({
+      where:   { company_id, parent_id },
+      orderBy: { name: "asc" },
+      select:  { id: true, name: true, path: true, type: true, created_at: true },
+    });
   }
 
-  /* ── TEAM-type parent: return all subfolders (permission filtering
-     is handled by checkFolderAccess on the client / dedicated routes) ── */
-  const folders = await prisma.dmsFolder.findMany({
-    where:   { company_id, parent_id },
-    orderBy: { name: "asc" },
-    select:  { id: true, name: true, path: true, type: true, created_at: true },
+  /* ── Fetch files in this folder (same logic as GET /api/dms/files) ── */
+  const files = await prisma.dmsDocument.findMany({
+    where:   { company_id, folder_path: parent.path },
+    orderBy: { created_at: "desc" },
+    select:  { id: true, name: true, file_url: true, uploaded_by: true, created_at: true },
   });
 
-  return NextResponse.json(folders);
+  const currentFolder = {
+    id:         parent.id,
+    name:       parent.name,
+    path:       parent.path,
+    type:       parent.type,
+    created_at: parent.created_at,
+  };
+
+  return NextResponse.json({ currentFolder, breadcrumbs, folders, files });
 }
 
 /* POST /api/dms/folders — create a subfolder or a TEAM root folder (admin only) */

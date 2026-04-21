@@ -438,9 +438,10 @@ function NewFolderModal({
 /* ─── Main Page ──────────────────────────────────────────────────────────── */
 
 export default function DmsMyFilesPage() {
-  const [rootFolder,    setRootFolder]    = useState<DmsFolder | null>(null);
-  const [currentFolder, setCurrentFolder] = useState<DmsFolder | null>(null);
-  const [breadcrumbs,   setBreadcrumbs]   = useState<BreadcrumbEntry[]>([]);
+  const [rootFolder,      setRootFolder]      = useState<DmsFolder | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolder,   setCurrentFolder]   = useState<DmsFolder | null>(null);
+  const [breadcrumbs,     setBreadcrumbs]     = useState<BreadcrumbEntry[]>([]);
 
   const [folders,  setFolders]  = useState<DmsFolder[]>([]);
   const [files,    setFiles]    = useState<DmsFile[]>([]);
@@ -480,32 +481,37 @@ export default function DmsMyFilesPage() {
     ])
       .then(([folder, settings]: [DmsFolder, { allow_user_folder_creation: boolean }]) => {
         setRootFolder(folder);
-        setCurrentFolder(folder);
-        setBreadcrumbs([{ id: folder.id, name: "My Files" }]);
+        setCurrentFolderId(folder.id);
         setAllowFolderCreation(settings?.allow_user_folder_creation ?? false);
       })
       .catch(() => setError("Failed to initialise your file space."));
   }, []);
 
-  /* ── load contents ── */
-  const loadContents = useCallback(async (folder: DmsFolder) => {
+  /* ── load contents — single fetch returns { currentFolder, breadcrumbs, folders, files } ── */
+  const loadContents = useCallback(async (folderId: string, rootFolderId?: string) => {
     setLoading(true); setError("");
     try {
-      const [fr, fi] = await Promise.all([
-        fetch(`/api/dms/folders?parent_id=${folder.id}`, { credentials: "include" }),
-        fetch(`/api/dms/files?folder_id=${folder.id}`,   { credentials: "include" }),
-      ]);
-      const [fd, fid] = await Promise.all([fr.json(), fi.json()]);
-      if (fr.ok) setFolders(Array.isArray(fd)  ? fd  : []);
-      if (fi.ok) setFiles(Array.isArray(fid)   ? fid : []);
+      const res  = await fetch(`/api/dms/folders?parent_id=${folderId}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to load contents."); return; }
+      const { currentFolder: cf, breadcrumbs: bc, folders: fds, files: fis } = data;
+      setCurrentFolder(cf ?? null);
+      /* Override the first crumb's name to "My Files" for the personal folder view */
+      const crumbs: BreadcrumbEntry[] = Array.isArray(bc) ? bc : [];
+      const displayCrumbs = crumbs.map((c, i) =>
+        i === 0 && c.id === (rootFolderId ?? rootFolder?.id) ? { ...c, name: "My Files" } : c,
+      );
+      setBreadcrumbs(displayCrumbs);
+      setFolders(Array.isArray(fds) ? fds : []);
+      setFiles(Array.isArray(fis)   ? fis : []);
     } catch {
       setError("Failed to load contents.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [rootFolder]);
 
-  useEffect(() => { if (currentFolder) loadContents(currentFolder); }, [currentFolder, loadContents]);
+  useEffect(() => { if (currentFolderId) loadContents(currentFolderId); }, [currentFolderId, loadContents]);
 
   /* ── batch-fetch permissions for list-view Delete buttons ── */
   useEffect(() => {
@@ -584,7 +590,7 @@ export default function DmsMyFilesPage() {
     setBulkDeleting(false);
     clearSelection();
     if (errors.length > 0) setBulkError(errors.join("; "));
-    if (currentFolder) loadContents(currentFolder);
+    if (currentFolderId) loadContents(currentFolderId);
   }
 
   function handleDownloadSelected() {
@@ -601,15 +607,12 @@ export default function DmsMyFilesPage() {
   /* ── navigate ── */
   function openFolder(folder: DmsFolder) {
     clearSelection();
-    setCurrentFolder(folder);
-    setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    setCurrentFolderId(folder.id);
   }
 
-  async function navigateTo(entry: BreadcrumbEntry, index: number) {
+  function navigateTo(entry: BreadcrumbEntry) {
     clearSelection();
-    setBreadcrumbs((prev) => prev.slice(0, index + 1));
-    if (index === 0 && rootFolder) { setCurrentFolder(rootFolder); return; }
-    setCurrentFolder({ id: entry.id, name: entry.name, path: "", type: "USER", created_at: "" });
+    setCurrentFolderId(entry.id);
   }
 
   /* ── double-click on folder (grid + list rows) ── */
@@ -635,7 +638,7 @@ export default function DmsMyFilesPage() {
       if (!res.ok) { setUploadError(json.error ?? "Upload failed."); return; }
       setUploadDone(true);
       setTimeout(() => setUploadDone(false), 3000);
-      if (currentFolder) loadContents(currentFolder);
+      if (currentFolderId) loadContents(currentFolderId);
     } catch {
       setUploadError("Network error. Please try again.");
     } finally {
@@ -718,7 +721,7 @@ export default function DmsMyFilesPage() {
     if (!deleteTarget) return;
     accessCache.current.delete(deleteTarget.id);
     setDeleteTarget(null);
-    if (currentFolder) loadContents(currentFolder);
+    if (currentFolderId) loadContents(currentFolderId);
   }
 
   const totalItems = folders.length + files.length;
@@ -769,7 +772,7 @@ export default function DmsMyFilesPage() {
           </div>
 
           <button
-            onClick={() => currentFolder && loadContents(currentFolder)}
+            onClick={() => currentFolderId && loadContents(currentFolderId)}
             className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
             title="Refresh"
             data-testid="btn-refresh"
@@ -875,7 +878,7 @@ export default function DmsMyFilesPage() {
             <span className="text-slate-300 select-none font-light">/</span>
             {idx < breadcrumbs.length - 1 ? (
               <button
-                onClick={() => navigateTo(crumb, idx)}
+                onClick={() => navigateTo(crumb)}
                 className="text-blue-600 hover:underline font-medium"
                 data-testid={`breadcrumb-${idx}`}
               >

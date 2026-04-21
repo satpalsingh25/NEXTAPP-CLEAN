@@ -956,8 +956,9 @@ function NewFolderModal({
 
 export default function DmsTeamFolderPage() {
   /* ── navigation state ── */
-  const [currentFolder, setCurrentFolder] = useState<DmsFolder | null>(null);
-  const [breadcrumbs,   setBreadcrumbs]   = useState<BreadcrumbEntry[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolder,   setCurrentFolder]   = useState<DmsFolder | null>(null);
+  const [breadcrumbs,     setBreadcrumbs]     = useState<BreadcrumbEntry[]>([]);
 
   /* ── current user ── */
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -1022,17 +1023,18 @@ export default function DmsTeamFolderPage() {
     }
   }, []);
 
-  /* ── load contents of a specific sub-folder ── */
-  const loadContents = useCallback(async (folder: DmsFolder) => {
+  /* ── load contents — single fetch returns { currentFolder, breadcrumbs, folders, files } ── */
+  const loadContents = useCallback(async (folderId: string) => {
     setLoading(true); setError("");
     try {
-      const [fr, fi] = await Promise.all([
-        fetch(`/api/dms/folders?parent_id=${folder.id}`, { credentials: "include" }),
-        fetch(`/api/dms/files?folder_id=${folder.id}`,   { credentials: "include" }),
-      ]);
-      const [fd, fid] = await Promise.all([fr.json(), fi.json()]);
-      if (fr.ok) setFolders(Array.isArray(fd)  ? fd  : []);
-      if (fi.ok) setFiles(Array.isArray(fid)   ? fid : []);
+      const res  = await fetch(`/api/dms/folders?parent_id=${folderId}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to load contents."); return; }
+      const { currentFolder: cf, breadcrumbs: bc, folders: fds, files: fis } = data;
+      setCurrentFolder(cf ?? null);
+      setBreadcrumbs(Array.isArray(bc) ? bc : []);
+      setFolders(Array.isArray(fds) ? fds : []);
+      setFiles(Array.isArray(fis)   ? fis : []);
     } catch {
       setError("Failed to load contents.");
     } finally {
@@ -1040,17 +1042,14 @@ export default function DmsTeamFolderPage() {
     }
   }, []);
 
-  /* ── on mount: load team folder root ── */
-  useEffect(() => { loadTopLevel(); }, [loadTopLevel]);
-
-  /* ── when currentFolder changes ── */
+  /* ── currentFolderId drives which view to show ── */
   useEffect(() => {
-    if (currentFolder === null) {
+    if (currentFolderId === null) {
       loadTopLevel();
     } else {
-      loadContents(currentFolder);
+      loadContents(currentFolderId);
     }
-  }, [currentFolder, loadTopLevel, loadContents]);
+  }, [currentFolderId, loadTopLevel, loadContents]);
 
   /* ── batch-fetch permissions for list-view Delete buttons ── */
   useEffect(() => {
@@ -1134,7 +1133,7 @@ export default function DmsTeamFolderPage() {
     setBulkDeleting(false);
     clearSelection();
     if (errors.length > 0) setBulkError(errors.join("; "));
-    if (currentFolder) loadContents(currentFolder); else loadTopLevel();
+    if (currentFolderId) loadContents(currentFolderId); else loadTopLevel();
   }
 
   function handleDownloadSelected() {
@@ -1151,21 +1150,20 @@ export default function DmsTeamFolderPage() {
   /* ── navigation ── */
   function openFolder(folder: DmsFolder) {
     clearSelection();
-    setCurrentFolder(folder);
-    setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    setCurrentFolderId(folder.id);
   }
 
   function navigateToRoot() {
     clearSelection();
+    setCurrentFolderId(null);
     setCurrentFolder(null);
     setBreadcrumbs([]);
     accessCache.current.clear();
   }
 
-  function navigateToCrumb(entry: BreadcrumbEntry, index: number) {
+  function navigateToCrumb(entry: BreadcrumbEntry) {
     clearSelection();
-    setBreadcrumbs((prev) => prev.slice(0, index + 1));
-    setCurrentFolder({ id: entry.id, name: entry.name, path: "", type: "TEAM", created_at: "" });
+    setCurrentFolderId(entry.id);
   }
 
   function handleFolderDoubleClick(folder: DmsFolder) {
@@ -1190,7 +1188,7 @@ export default function DmsTeamFolderPage() {
       if (!res.ok) { setUploadError(json.error ?? "Upload failed."); return; }
       setUploadDone(true);
       setTimeout(() => setUploadDone(false), 3000);
-      if (currentFolder) loadContents(currentFolder);
+      if (currentFolderId) loadContents(currentFolderId);
     } catch {
       setUploadError("Network error. Please try again.");
     } finally {
@@ -1293,11 +1291,11 @@ export default function DmsTeamFolderPage() {
     accessCache.current.delete(deleteTarget.id);
     setDeleteTarget(null);
     if (currentFolder === null) loadTopLevel();
-    else loadContents(currentFolder);
+    else if (currentFolderId) loadContents(currentFolderId);
   }
 
   /* ── derived ── */
-  const isAtRoot     = currentFolder === null;
+  const isAtRoot     = currentFolderId === null;
   const isAdmin      = currentUserRole === "ADMIN";
   const canUpload    = !isAtRoot && (isAdmin || (rowPerms[currentFolder?.id ?? ""]?.can_upload ?? false));
   const canNewFolder = !isAtRoot && (isAdmin || (rowPerms[currentFolder?.id ?? ""]?.can_upload ?? false));
@@ -1349,7 +1347,7 @@ export default function DmsTeamFolderPage() {
 
           {/* Refresh */}
           <button
-            onClick={() => isAtRoot ? loadTopLevel() : currentFolder && loadContents(currentFolder)}
+            onClick={() => isAtRoot ? loadTopLevel() : currentFolderId && loadContents(currentFolderId)}
             className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
             title="Refresh"
             data-testid="btn-refresh"
@@ -1468,7 +1466,7 @@ export default function DmsTeamFolderPage() {
             <span className="text-slate-300 select-none font-light">/</span>
             {idx < breadcrumbs.length - 1 ? (
               <button
-                onClick={() => navigateToCrumb(crumb, idx)}
+                onClick={() => navigateToCrumb(crumb)}
                 className="text-blue-600 hover:underline font-medium"
                 data-testid={`breadcrumb-${idx}`}
               >
