@@ -120,6 +120,16 @@ function buildPermissions(role: string) {
   } as Record<string, boolean>;
 }
 
+/* Sidebar nav `key` → master Module.name mapping. Modules NOT in this map
+   (e.g. "admin") are never gated by tenant module access. */
+const KEY_TO_MODULE_NAME: Record<string, string> = {
+  compliance: "COMPLIANCE",
+  amc:        "AMC",
+  dms:        "DMS",
+};
+
+type ModuleFlag = { name: string; enabled: boolean };
+
 export default function Sidebar() {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
@@ -127,15 +137,37 @@ export default function Sidebar() {
   const role         = user?.role ?? "USER";
   const can          = useMemo(() => buildPermissions(role), [role]);
 
+  /* Tenant-level module access flags — fetched from /api/modules.       */
+  /* `null` until the first response so we render nothing for gated      */
+  /* entries (avoids a flash-then-hide). Default ALLOW once loaded.      */
+  const [moduleFlags, setModuleFlags] = useState<ModuleFlag[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/modules")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ModuleFlag[]) => setModuleFlags(Array.isArray(data) ? data : []))
+      .catch(() => setModuleFlags([]));
+  }, []);
+
+  function isModuleEnabled(navKey: string): boolean {
+    const moduleName = KEY_TO_MODULE_NAME[navKey];
+    if (!moduleName) return true;                  // not a gated module (e.g. admin)
+    if (moduleFlags === null) return false;        // still loading — hide gated entries
+    const flag = moduleFlags.find((m) => m.name === moduleName);
+    return flag ? flag.enabled : true;             // default visible if not in master
+  }
+
   const visibleModules = useMemo(() =>
     ALL_MODULES
       .filter((m) => !m.perm || can[m.perm])
+      .filter((m) => isModuleEnabled(m.key))
       .map((m) => ({
         ...m,
         children: m.children.filter((c) => !c.perm || can[c.perm]),
       }))
       .filter((m) => m.children.length > 0),
-    [can]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [can, moduleFlags]);
 
   const initialOpen = useMemo(() =>
     visibleModules.reduce((acc, m) => {
