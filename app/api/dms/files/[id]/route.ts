@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { logDmsActivity } from "@/lib/dms-activity";
+import { gateModule } from "@/lib/module-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,6 +13,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function DELETE(req: NextRequest, { params }: Params) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
   const { id } = await params;
 
@@ -59,6 +62,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
   const { id } = await params;
 

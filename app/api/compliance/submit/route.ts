@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { gateModule } from "@/lib/module-access";
 
 export async function POST(req: NextRequest) {
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
+
   try {
     const body = await req.json();
     const { id } = body;

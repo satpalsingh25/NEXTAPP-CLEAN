@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* GET /api/dms/file?file_id=<uuid>[&download=true]                    */
@@ -13,6 +14,8 @@ import { checkFolderAccess } from "@/lib/dms-permission";
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   const { searchParams } = new URL(req.url);
@@ -115,6 +118,8 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   const { searchParams } = new URL(req.url);

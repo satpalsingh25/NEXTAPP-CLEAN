@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { uploadFile }               from "@/lib/storage";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/compliance/[id]/upload                                     */
@@ -20,6 +21,8 @@ export async function POST(
 ) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
   const { id: compliance_id } = await params;

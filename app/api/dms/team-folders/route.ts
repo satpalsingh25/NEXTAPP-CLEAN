@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* GET /api/dms/team-folders                                           */
@@ -20,6 +21,8 @@ import { requireAuth } from "@/lib/auth.server";
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { user_id, company_id } = auth.user;
 
   /* 1. Fetch full user profile --------------------------------------- */

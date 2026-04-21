@@ -5,6 +5,7 @@ import archiver                     from "archiver";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/download-zip                                           */
@@ -58,6 +59,8 @@ async function collectFolderFiles(
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   /* --- Parse body -------------------------------------------------- */

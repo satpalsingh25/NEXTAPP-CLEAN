@@ -5,6 +5,7 @@ import { createFolder } from "@/lib/sharepoint-check";
 import { ensureCompanyRootFolder } from "@/lib/dms-company-root";
 import { buildFolderPath } from "@/lib/dms-folder-path";
 import { logDmsActivity } from "@/lib/dms-activity";
+import { gateModule } from "@/lib/module-access";
 
 /* Build breadcrumb trail by walking up the parent chain */
 async function buildBreadcrumbs(
@@ -31,6 +32,8 @@ async function buildBreadcrumbs(
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
   const { searchParams } = new URL(req.url);
@@ -103,6 +106,8 @@ export async function POST(req: NextRequest) {
   if (type === "TEAM") {
     const auth = requireRole(req, ADMIN_ONLY);
     if ("error" in auth) return auth.error;
+    const gate = await gateModule(req, "DMS");
+    if (gate) return gate;
     const { company_id, user_id } = auth.user;
 
     const company = await prisma.company.findUnique({
@@ -169,6 +174,8 @@ export async function POST(req: NextRequest) {
   /* ── USER subfolder — any authenticated user ──────────────────────────── */
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
   /* ── Resolve parent path ────────────────────────────────────────────── */

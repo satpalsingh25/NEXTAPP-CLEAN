@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 // Returns all compliance records (for the selector), each with their current
 // approval matrix level count and template info.
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ADMIN_ONLY);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { company_id, role } = auth.user;
 
   try {

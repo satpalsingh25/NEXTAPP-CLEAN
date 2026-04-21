@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* GET /api/dms/folder-access?folder_id=<uuid>                         */
@@ -11,6 +12,8 @@ import { checkFolderAccess } from "@/lib/dms-permission";
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
 
   const { searchParams } = new URL(req.url);
   const folder_id = searchParams.get("folder_id");

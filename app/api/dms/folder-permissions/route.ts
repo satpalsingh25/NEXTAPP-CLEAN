@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 const VALID_ACCESS_TYPES = ["USER", "GROUP", "DEPARTMENT", "FUNCTION", "COMPANY"] as const;
 type AccessType = (typeof VALID_ACCESS_TYPES)[number];
@@ -12,6 +13,8 @@ type AccessType = (typeof VALID_ACCESS_TYPES)[number];
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
 
   const { searchParams } = new URL(req.url);
   const folder_id   = searchParams.get("folder_id");
@@ -53,6 +56,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   const body = await req.json();
@@ -123,6 +128,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");

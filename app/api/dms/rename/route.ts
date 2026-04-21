@@ -5,6 +5,7 @@ import type { AuthUser } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { getDriveId, getSharePointToken, checkSharePointConfigured } from "@/lib/sharepoint-check";
 import { logDmsActivity } from "@/lib/dms-activity";
+import { gateModule } from "@/lib/module-access";
 
 /* Characters forbidden in folder/file names */
 const INVALID_NAME_RE = /[/\\?%*:|"<>]/;
@@ -16,6 +17,8 @@ const INVALID_NAME_RE = /[/\\?%*:|"<>]/;
 export async function PATCH(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
 
   const body = await req.json().catch(() => null);
   const { id, type, new_name } = body ?? {};

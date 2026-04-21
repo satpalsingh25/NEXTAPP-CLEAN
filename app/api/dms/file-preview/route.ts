@@ -3,6 +3,7 @@ import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess }        from "@/lib/dms-permission";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* MIME type map — used as fallback when SharePoint omits Content-Type  */
@@ -36,6 +37,8 @@ function mimeFromName(name: string): string {
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   const id = new URL(req.url).searchParams.get("id");

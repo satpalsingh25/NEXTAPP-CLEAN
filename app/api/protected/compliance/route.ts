@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { user_id: userId, company_id: companyId } = auth.user;
 
   try {
@@ -41,6 +44,8 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { company_id: companyId } = auth.user;
 
   const compliances = await prisma.compliance.findMany({

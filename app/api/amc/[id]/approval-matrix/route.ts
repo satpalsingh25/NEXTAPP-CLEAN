@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 export async function GET(
   req: NextRequest,
@@ -8,6 +9,8 @@ export async function GET(
 ) {
   const auth = requireRole(req, ADMIN_ONLY);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "AMC");
+  if (gate) return gate;
 
   const { id } = await params;
 
@@ -40,6 +43,8 @@ export async function DELETE(
 ) {
   const auth = requireRole(req, ADMIN_ONLY);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "AMC");
+  if (gate) return gate;
   const { id } = await params;
 
   try {
@@ -59,6 +64,8 @@ export async function POST(
 ) {
   const auth = requireRole(req, ADMIN_ONLY);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "AMC");
+  if (gate) return gate;
 
   const { id } = await params;
 

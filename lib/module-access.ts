@@ -1,6 +1,6 @@
-import { NextRequest } from "next/server";
-import { prisma }      from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth.server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma }                    from "@/lib/prisma";
+import { requireAuth }               from "@/lib/auth.server";
 
 /* ================================================================== */
 /*  Module Access Control                                               */
@@ -63,5 +63,29 @@ export async function requireModuleAccess(
   const allowed = await hasModuleAccess(auth.user.company_id, moduleName);
   if (!allowed) {
     throw new Error("Module not enabled for this company");
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* gateModule                                                           */
+/*                                                                      */
+/*  Drop-in route gate. Returns a 403 NextResponse if the module is    */
+/*  disabled for the caller's company; returns null when access is OK. */
+/*                                                                      */
+/*  Pattern (parallels requireAuth's `error` shape):                    */
+/*    const gate = await gateModule(req, "AMC");                        */
+/*    if (gate) return gate;                                            */
+/* ------------------------------------------------------------------ */
+export async function gateModule(
+  req:        NextRequest,
+  moduleName: string,
+): Promise<NextResponse | null> {
+  try {
+    await requireModuleAccess(req, moduleName);
+    return null;
+  } catch (e) {
+    const msg = (e as Error).message;
+    const status = msg === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ error: "Module not enabled" }, { status });
   }
 }

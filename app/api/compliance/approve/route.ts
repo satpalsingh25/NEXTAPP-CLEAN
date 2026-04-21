@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, APPROVER_PLUS } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 const MAX_LEVEL = 3;
 
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, APPROVER_PLUS);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
 
   const { role } = auth.user;
   if (role !== "APPROVER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {

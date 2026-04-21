@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole, MANAGER_PLUS } from "@/lib/auth.server";
 import { ensureStatusExists } from "@/lib/seedStatuses";
+import { gateModule } from "@/lib/module-access";
 
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { company_id, role } = auth.user;
 
   try {
@@ -43,6 +46,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, MANAGER_PLUS);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "COMPLIANCE");
+  if (gate) return gate;
   const { company_id } = auth.user;
 
   try {

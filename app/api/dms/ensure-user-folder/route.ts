@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { ensureCompanyRootFolder } from "@/lib/dms-company-root";
 import { buildFolderPath } from "@/lib/dms-folder-path";
+import { gateModule } from "@/lib/module-access";
 
 /** Replace spaces with _ and strip anything that isn't a word char or hyphen. */
 function sanitizeName(raw: string): string {
@@ -15,6 +16,8 @@ function sanitizeName(raw: string): string {
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
   /* 1. Reuse existing folder if one already exists (never move/rename) */

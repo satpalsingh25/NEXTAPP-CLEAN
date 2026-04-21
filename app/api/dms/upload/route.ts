@@ -5,6 +5,7 @@ import { validateUpload } from "@/lib/dms-validation";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { logDmsActivity } from "@/lib/dms-activity";
+import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/upload                                                 */
@@ -14,6 +15,8 @@ import { logDmsActivity } from "@/lib/dms-activity";
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "DMS");
+  if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
   /* 1. Parse multipart body ---------------------------------------- */

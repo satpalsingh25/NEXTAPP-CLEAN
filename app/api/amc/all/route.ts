@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
+import { gateModule } from "@/lib/module-access";
 
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const gate = await gateModule(req, "AMC");
+  if (gate) return gate;
   const { user_id, company_id, role } = auth.user;
 
   try {
