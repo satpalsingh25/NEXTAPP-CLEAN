@@ -34,6 +34,7 @@ type NavChild = {
   href: string;
   icon: React.ElementType;
   perm?: "create" | "templates" | "matrix" | "pending" | "super_admin";
+  group?: string;
 };
 
 type NavModule = {
@@ -96,10 +97,16 @@ const ALL_MODULES: NavModule[] = [
       { name: "Functions",     href: "/admin/functions",    icon: FunctionSquare },
       { name: "Departments",   href: "/admin/departments",  icon: Building },
       { name: "Countries",     href: "/admin/countries",    icon: Globe },
-      { name: "SMTP Settings",       href: "/admin/smtp",             icon: Mail },
-      { name: "Email Templates",   href: "/admin/email-templates",  icon: FileCode },
-      { name: "SharePoint Config",  href: "/admin/sharepoint",       icon: Cloud },
-      { name: "DMS Settings",      href: "/admin/dms-settings",     icon: HardDrive },
+
+      /* ── Company Settings group ── */
+      { name: "General",              href: "/admin/companies",  icon: Building2, perm: "super_admin", group: "Company Settings" },
+      { name: "Branding",             href: "/admin/companies",  icon: Building2, perm: "super_admin", group: "Company Settings" },
+      { name: "SharePoint Settings",  href: "/admin/sharepoint", icon: Cloud,                          group: "Company Settings" },
+      { name: "DMS Settings",         href: "/admin/dms-settings", icon: HardDrive,                    group: "Company Settings" },
+
+      /* ── Mail Settings group ── */
+      { name: "SMTP Settings",        href: "/admin/smtp",            icon: Mail,     group: "Mail Settings" },
+      { name: "Template Settings",    href: "/admin/email-templates", icon: FileCode, group: "Mail Settings" },
     ],
   },
 ];
@@ -243,22 +250,41 @@ export default function Sidebar() {
                 />
               </button>
 
-              <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
+              <div className={`overflow-hidden transition-all duration-[400ms] ease-in-out ${isExpanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"}`}>
                 <div className="mt-0.5 ml-2 pl-4 border-l border-slate-700 space-y-0.5 py-1">
-                  {mod.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                        isLinkActive(child.href)
-                          ? "bg-slate-700 text-white font-medium"
-                          : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                      }`}
-                    >
-                      <child.icon size={14} className="shrink-0" />
-                      <span>{child.name}</span>
-                    </Link>
-                  ))}
+                  {(() => {
+                    /* Render children grouped by `group` label, preserving order. */
+                    const blocks: { group: string | null; items: NavChild[] }[] = [];
+                    mod.children.forEach((c) => {
+                      const g = c.group ?? null;
+                      const last = blocks[blocks.length - 1];
+                      if (last && last.group === g) last.items.push(c);
+                      else blocks.push({ group: g, items: [c] });
+                    });
+                    return blocks.map((block, idx) => (
+                      <div key={`${block.group ?? "_"}-${idx}`} className={block.group ? "mt-2" : ""}>
+                        {block.group && (
+                          <div className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                            {block.group}
+                          </div>
+                        )}
+                        {block.items.map((child, i) => (
+                          <Link
+                            key={`${child.href}-${child.name}-${i}`}
+                            href={child.href}
+                            className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                              isLinkActive(child.href)
+                                ? "bg-slate-700 text-white font-medium"
+                                : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                            }`}
+                          >
+                            <child.icon size={14} className="shrink-0" />
+                            <span>{child.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>

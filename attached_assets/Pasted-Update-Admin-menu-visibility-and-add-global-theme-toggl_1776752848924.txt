@@ -1,0 +1,134 @@
+Update Admin menu visibility and add global theme toggle.
+
+----------------------------------------
+STEP 1 — ROLE CHECK
+----------------------------------------
+
+Assume:
+
+req.user.role OR user.role
+
+----------------------------------------
+STEP 2 — HIDE COMPANIES MENU
+----------------------------------------
+
+Condition:
+
+{user.role === "SUPER_ADMIN" && <CompaniesMenu />}
+
+----------------------------------------
+RESULT
+----------------------------------------
+
+✔ Companies visible ONLY to Super Admin
+✔ Hidden for Admin
+
+----------------------------------------
+STEP 3 — SHOW ALL OTHER MENUS
+----------------------------------------
+
+✔ No restriction
+✔ Visible to:
+   • Super Admin
+   • Admin
+
+----------------------------------------
+STEP 4 — COMPANY SETTINGS SUBMENU
+----------------------------------------
+
+Group:
+
+Company Settings
+  ├── General
+  ├── Branding
+  └── SharePoint Settings
+
+----------------------------------------
+STEP 5 — MAIL SETTINGS SUBMENU
+----------------------------------------
+
+Mail Settings
+  ├── SMTP Settings
+  └── Template Settings
+
+----------------------------------------
+STEP 6 — THEME TOGGLE (GLOBAL)
+----------------------------------------
+
+LOCATION:
+
+Top-right corner near Logout button
+
+----------------------------------------
+UI
+----------------------------------------
+
+Icon toggle:
+
+🌞 Light | 🌙 Dark
+
+----------------------------------------
+STATE
+----------------------------------------
+
+const [theme, setTheme]
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+onToggle:
+
+if (theme === "light") {
+  setTheme("dark")
+  document.body.classList.add("dark")
+} else {
+  setTheme("light")
+  document.body.classList.remove("dark")
+}
+
+----------------------------------------
+PERSISTENCE
+----------------------------------------
+
+Use localStorage:
+
+localStorage.setItem("theme", theme)
+
+on load:
+
+const savedTheme = localStorage.getItem("theme")
+
+----------------------------------------
+PRIORITY RULE
+----------------------------------------
+
+User preference overrides branding default
+
+----------------------------------------
+STEP 7 — INITIAL LOAD
+----------------------------------------
+
+On app start:
+
+if (userPreference exists):
+  apply that
+else:
+  apply branding.theme_mode
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Works for ALL roles
+✔ Instant switch
+✔ No page reload
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Routing
+• APIs
+• Backend
+• Permissions logic

@@ -5,6 +5,7 @@ import { useBranding } from "@/context/BrandingContext";
 import Link from "next/link";
 import { LogOut, LogIn, UserCircle } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
@@ -33,6 +34,8 @@ export default function Header() {
       <div className="flex items-center space-x-3">
         <a href="/dashboard" className="mr-2 text-sm text-slate-700 hover:text-slate-900 transition-colors">Dashboard</a>
         <a href="/admin" className="mr-2 text-sm text-slate-700 hover:text-slate-900 transition-colors">Admin</a>
+
+        <ThemeToggle />
 
         {user && <NotificationBell />}
 
