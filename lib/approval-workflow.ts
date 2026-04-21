@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Module, Action, Role } from "@prisma/client";
+import { ModuleType, Action, Role } from "@prisma/client";
 
 export async function submitForApproval({
   companyId,
@@ -9,7 +9,7 @@ export async function submitForApproval({
 }: {
   companyId: string;
   userId: string;
-  module: Module;
+  module: ModuleType;
   recordId: string;
 }) {
   const data = {
@@ -51,7 +51,7 @@ export async function processApproval({
 }: {
   companyId: string;
   userId: string;
-  module: Module;
+  module: ModuleType;
   recordId: string;
   action: "APPROVED" | "REJECTED";
   remarks?: string;

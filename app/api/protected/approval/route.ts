@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processApproval } from "@/lib/approval-workflow";
-import { Module } from "@prisma/client";
+import { ModuleType } from "@prisma/client";
 import { requireAuth } from "@/lib/auth.server";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     await processApproval({
       companyId,
       userId,
-      module: module as Module,
+      module: module as ModuleType,
       recordId,
       action: action as "APPROVED" | "REJECTED",
       remarks,

@@ -23,7 +23,7 @@ enum Role {
   CEO
 }
 
-enum Module {
+enum ModuleType {
   COMPLIANCE
   AMC
   TICKET
@@ -52,6 +52,7 @@ model Company {
   compliances          Compliance[]
   amcs                 AMC[]
   documents            Document[]
+  company_modules      CompanyModule[]
   approval_logs        ApprovalLog[]
   audit_logs           AuditLog[]
   country_id           String?            @db.Uuid
@@ -116,7 +117,7 @@ model StatusMaster {
   id          String       @id @default(uuid()) @db.Uuid
   company_id  String       @db.Uuid
   company     Company      @relation(fields: [company_id], references: [id])
-  module      Module
+  module      ModuleType
   name        String
   is_final    Boolean      @default(false)
   order_index Int          @default(0)
@@ -129,7 +130,7 @@ model ApprovalMatrix {
   id           String   @id @default(uuid()) @db.Uuid
   company_id   String   @db.Uuid
   company      Company  @relation(fields: [company_id], references: [id])
-  module       Module
+  module       ModuleType
   level_number Int
   role_required Role
   created_at   DateTime @default(now())
@@ -258,7 +259,7 @@ model Document {
   id          String   @id @default(uuid()) @db.Uuid
   company_id  String   @db.Uuid
   company     Company  @relation(fields: [company_id], references: [id])
-  module      Module
+  module      ModuleType
   record_id   String   @db.Uuid
   file_path   String
   uploaded_by String   @db.Uuid
@@ -269,7 +270,7 @@ model ApprovalLog {
   id           String   @id @default(uuid()) @db.Uuid
   company_id   String   @db.Uuid
   company      Company  @relation(fields: [company_id], references: [id])
-  module       Module
+  module       ModuleType
   record_id    String   @db.Uuid
   level_number Int
   action       Action
@@ -285,7 +286,7 @@ model AuditLog {
   user_id     String   @db.Uuid
   user        User     @relation(fields: [user_id], references: [id])
   action_type String
-  module      Module
+  module      ModuleType
   record_id   String   @db.Uuid
   old_value   Json?
   new_value   Json?
@@ -503,4 +504,36 @@ model DmsDocument {
   sharepoint_item_id  String?  // Graph API DriveItem.id — used for preview/download/delete
   drive_id            String?  // Graph API drive ID at upload time
   created_at          DateTime @default(now())
+}
+
+/* ================================================================== */
+/*  Module Access Control                                               */
+/*                                                                      */
+/*  Module        — master list of toggleable product modules           */
+/*                  (AMC | COMPLIANCE | DMS, plus future ones).         */
+/*  CompanyModule — per-tenant enable/disable mapping.                  */
+/*                                                                      */
+/*  NOTE: distinct from `enum ModuleType` (used by Document/ApprovalLog */
+/*  to tag which workflow a record belongs to). The model below drives  */
+/*  feature gating for entire tenants.                                  */
+/* ================================================================== */
+
+model Module {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String          @unique          // AMC | COMPLIANCE | DMS
+  created_at      DateTime        @default(now())
+
+  company_modules CompanyModule[]
+}
+
+model CompanyModule {
+  id          String   @id @default(uuid()) @db.Uuid
+  company_id  String   @db.Uuid
+  module_id   String   @db.Uuid
+  enabled     Boolean  @default(true)
+
+  company     Company  @relation(fields: [company_id], references: [id])
+  module      Module   @relation(fields: [module_id], references: [id])
+
+  @@unique([company_id, module_id])
 }
