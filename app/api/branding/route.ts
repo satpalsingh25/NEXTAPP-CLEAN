@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
-import { requireRole }              from "@/lib/auth.server";
+import { requireAuth, requireRole } from "@/lib/auth.server";
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -9,10 +9,10 @@ const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 /*                                                                      */
 /* Returns the current company's branding row. Auto-creates a default  */
 /* row on first read so the UI always receives a usable object.        */
-/* SUPER_ADMIN + ADMIN only.                                           */
+/* Open to ANY authenticated user — branding applies app-wide.         */
 /* ------------------------------------------------------------------ */
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["SUPER_ADMIN", "ADMIN"]);
+  const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
 
   const company_id = auth.user.company_id;
