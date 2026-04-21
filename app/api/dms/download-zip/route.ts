@@ -22,22 +22,24 @@ interface ZipEntry {
   zipPath:     string;
 }
 
-/* Recursively collects all DmsDocument records under a folder */
+/* Recursively collects all DmsDocument records under a folder.
+   DmsDocument has no FK to DmsFolder; the relationship is by folder_path. */
 async function collectFolderFiles(
-  folder_id:  string,
-  company_id: string,
-  zipPrefix:  string,
-  results:    ZipEntry[],
+  folder_id:   string,
+  folder_path: string,   // DmsFolder.path — used to match DmsDocument.folder_path
+  company_id:  string,
+  zipPrefix:   string,
+  results:     ZipEntry[],
 ): Promise<void> {
   if (results.length >= MAX_FILES) return;
 
   const [subFolders, docs] = await Promise.all([
     prisma.dmsFolder.findMany({
       where:  { company_id, parent_id: folder_id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, path: true },
     }),
     prisma.dmsDocument.findMany({
-      where:  { company_id, folder_id },
+      where:  { company_id, folder_path },
       select: { name: true, folder_path: true },
     }),
   ]);
@@ -49,7 +51,7 @@ async function collectFolderFiles(
 
   for (const sub of subFolders) {
     if (results.length >= MAX_FILES) break;
-    await collectFolderFiles(sub.id, company_id, `${zipPrefix}${sub.name}/`, results);
+    await collectFolderFiles(sub.id, sub.path, company_id, `${zipPrefix}${sub.name}/`, results);
   }
 }
 
@@ -104,10 +106,10 @@ export async function POST(req: NextRequest) {
     if (type !== "file") {
       const folder = await prisma.dmsFolder.findFirst({
         where:  { id: rawId, company_id },
-        select: { id: true, name: true },
+        select: { id: true, name: true, path: true },
       });
       if (folder) {
-        await collectFolderFiles(folder.id, company_id, `${folder.name}/`, entries);
+        await collectFolderFiles(folder.id, folder.path, company_id, `${folder.name}/`, entries);
         continue;
       }
     }

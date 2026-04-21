@@ -13,10 +13,11 @@ async function buildBreadcrumbs(
   const crumbs: { id: string; name: string }[] = [];
   let currentId: string | null = folderId;
   while (currentId) {
-    const folder = await prisma.dmsFolder.findUnique({
-      where:  { id: currentId },
-      select: { id: true, name: true, parent_id: true },
-    });
+    const folder: { id: string; name: string; parent_id: string | null } | null =
+      await prisma.dmsFolder.findUnique({
+        where:  { id: currentId },
+        select: { id: true, name: true, parent_id: true },
+      });
     if (!folder) break;
     crumbs.unshift({ id: folder.id, name: folder.name });
     currentId = folder.parent_id;
