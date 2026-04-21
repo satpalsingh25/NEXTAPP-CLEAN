@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Building2, Users, Plus, X, ShieldCheck, Globe, Pencil, Layers,
-  ChevronRight, PowerOff, Trash2, AlertTriangle, Power } from "lucide-react";
+  ChevronRight, PowerOff, Trash2, AlertTriangle, Power, Boxes, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface Country { id: string; name: string }
@@ -60,6 +60,48 @@ export default function CompaniesPage() {
 
   // Inline action error
   const [actionError, setActionError] = useState("");
+
+  // Manage Modules
+  type ModuleRow = { id: string; name: string; enabled: boolean };
+  const [modulesCo,    setModulesCo]    = useState<Company | null>(null);
+  const [moduleRows,   setModuleRows]   = useState<ModuleRow[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(false);
+  const [modulesSaving,  setModulesSaving]  = useState(false);
+  const [modulesToast,   setModulesToast]   = useState("");
+
+  const openModules = async (co: Company) => {
+    setModulesCo(co);
+    setModuleRows([]);
+    setModulesLoading(true);
+    try {
+      const data = await fetch(`/api/admin/company-modules?company_id=${co.id}`).then((r) => r.json());
+      setModuleRows(Array.isArray(data) ? data : []);
+    } finally {
+      setModulesLoading(false);
+    }
+  };
+
+  const toggleModule = (id: string) =>
+    setModuleRows((rows) => rows.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+
+  const saveModules = async () => {
+    if (!modulesCo) return;
+    setModulesSaving(true);
+    const res = await fetch("/api/admin/company-modules", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        company_id: modulesCo.id,
+        modules:    moduleRows.map((r) => ({ module_id: r.id, enabled: r.enabled })),
+      }),
+    });
+    setModulesSaving(false);
+    if (res.ok) {
+      setModulesToast("Modules updated");
+      setModulesCo(null);
+      setTimeout(() => setModulesToast(""), 2500);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -260,6 +302,15 @@ export default function CompaniesPage() {
                             <Pencil size={14} />
                           </button>
 
+                          {/* Manage Modules */}
+                          <button
+                            onClick={() => openModules(c)}
+                            title="Manage Modules"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            data-testid={`btn-modules-${c.id}`}>
+                            <Boxes size={14} />
+                          </button>
+
                           {/* Disable / Enable */}
                           <button
                             onClick={() => toggleDisable(c)}
@@ -355,6 +406,70 @@ export default function CompaniesPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Manage Modules Modal */}
+      {modulesCo && (
+        <Modal title={`Manage Modules — ${modulesCo.name}`} onClose={() => !modulesSaving && setModulesCo(null)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-500" />
+              Disabling a module hides it from the sidebar and blocks its APIs. Existing data is preserved and reappears when re-enabled.
+            </div>
+
+            {modulesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+              </div>
+            ) : moduleRows.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">No modules configured.</p>
+            ) : (
+              <div className="space-y-1">
+                {moduleRows.map((m) => (
+                  <label
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
+                    data-testid={`module-row-${m.name}`}
+                  >
+                    <span className="text-sm font-medium text-slate-800">{m.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={m.enabled}
+                      onChange={() => toggleModule(m.id)}
+                      className="w-4 h-4 accent-blue-600 cursor-pointer"
+                      data-testid={`module-toggle-${m.name}`}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button
+                onClick={() => setModulesCo(null)}
+                disabled={modulesSaving}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveModules}
+                disabled={modulesSaving || modulesLoading || moduleRows.length === 0}
+                className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                data-testid="btn-save-modules"
+              >
+                {modulesSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Module update toast */}
+      {modulesToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg">
+          <Check size={15} /> {modulesToast}
+        </div>
       )}
 
       {/* Delete Confirm Modal */}

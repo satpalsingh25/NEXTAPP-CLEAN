@@ -1,0 +1,140 @@
+Implement Module Assignment modal for Super Admin.
+
+----------------------------------------
+STEP 1 — API (GET COMPANY MODULES)
+----------------------------------------
+
+GET /api/admin/company-modules?company_id=XXX
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+const modules = await prisma.module.findMany({
+  include: {
+    company_modules: {
+      where: { company_id }
+    }
+  }
+})
+
+return modules.map(m => ({
+  id: m.id,
+  name: m.name,
+  enabled: m.company_modules[0]?.enabled ?? true
+}))
+
+----------------------------------------
+STEP 2 — API (UPDATE MODULES)
+----------------------------------------
+
+POST /api/admin/company-modules
+
+Body:
+{
+  company_id,
+  modules: [
+    { module_id, enabled }
+  ]
+}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+for (const m of modules) {
+  await prisma.companyModule.upsert({
+    where: {
+      company_id_module_id: {
+        company_id,
+        module_id: m.module_id
+      }
+    },
+    update: { enabled: m.enabled },
+    create: {
+      company_id,
+      module_id: m.module_id,
+      enabled: m.enabled
+    }
+  })
+}
+
+return { success: true }
+
+----------------------------------------
+STEP 3 — FRONTEND (MODAL)
+----------------------------------------
+
+Trigger:
+
+Button in Company List:
+
+[ Manage Modules ]
+
+----------------------------------------
+OPEN MODAL
+----------------------------------------
+
+On click:
+→ fetch GET API
+
+----------------------------------------
+MODAL UI
+----------------------------------------
+
+Title: Manage Modules
+
+List:
+
+[✓] AMC
+[✓] COMPLIANCE
+[✓] DMS
+
+----------------------------------------
+INTERACTION
+----------------------------------------
+
+Checkbox toggle:
+
+✔ Checked = enabled
+✔ Unchecked = disabled
+
+----------------------------------------
+SAVE BUTTON
+----------------------------------------
+
+[ Save ]
+
+----------------------------------------
+ON SAVE
+----------------------------------------
+
+Call POST API
+
+----------------------------------------
+SUCCESS
+----------------------------------------
+
+✔ Show toast: "Modules updated"
+✔ Close modal
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+✔ Only Super Admin can access
+✔ Company Admin cannot change other companies
+
+----------------------------------------
+OPTIONAL (GOOD UX)
+----------------------------------------
+
+✔ Disable all warning:
+"Disabling will hide module but data remains safe"
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Existing company logic
+• Permissions
