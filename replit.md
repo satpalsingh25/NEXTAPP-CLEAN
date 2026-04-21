@@ -335,6 +335,86 @@ Compliance and AMC uploads **never** create DMS folder entries or check DMS perm
 
 ---
 
+## Module Access Control
+
+Per-tenant feature gating. A `Module` master table lists toggleable features (`COMPLIANCE`, `AMC`, `DMS`); a `CompanyModule` row enables/disables each module for each company. **Default is allow** — absence of a `CompanyModule` row means the module is enabled.
+
+- `lib/module-access.ts → gateModule()` is injected into every AMC, Compliance, and DMS API route. Disabled modules return `403 Module disabled`.
+- `GET /api/admin/company-modules?company_id=…` and `POST /api/admin/company-modules` (SUPER_ADMIN) drive the **Manage Modules** modal on `/admin/companies`.
+- `GET /api/modules` (any auth user) returns the current company's enabled-module list; the Sidebar uses it to hide gated entries.
+
+---
+
+## Branding System
+
+All branding lives in a single `Branding` row per company (`@unique company_id`). Logos and login images are stored as **base64 `data:image/*` URIs in the database** — no SharePoint, no upload route, no external dependency.
+
+### Schema (`Branding` model)
+
+| Field | Type | Notes |
+|---|---|---|
+| `app_name` | `String?` | Replaces "Compliance & AMC" in sidebar header + login welcome |
+| `browser_title` | `String?` | Sets `document.title` |
+| `logo_base64` | `String? @db.Text` | App header logo |
+| `login_banner` | `String? @db.Text` | Image above the Sign-In form |
+| `login_footer` | `String? @db.Text` | Plain-text footer below Sign-In button (preserves line breaks) |
+| `login_bg` | `String? @db.Text` | Hex color (`#0f172a`) **or** `data:image/*` URI |
+| `primary_color` / `secondary_color` | `String?` | Hex; drives `--primary-color` / `--secondary-color` CSS vars |
+| `theme_mode` | `String @default("light")` | Default theme; per-user toggle overrides |
+
+Image fields capped server-side at ~2 MB of base64; text fields capped at 500 chars.
+
+### API Routes
+
+| Route | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/branding` | GET | any auth user | Auto-creates + returns the caller's company branding |
+| `/api/branding` | POST | ADMIN+ | Patch-style upsert — only fields present in body are written |
+| `/api/branding/public` | GET | **public** | Safe subset (`app_name`, `logo_base64`, `login_*`, `primary_color`, `theme_mode`) for the unauthenticated login page. Returns the first `Branding` row in the DB. |
+
+### Client Wiring
+
+- **`context/BrandingContext.tsx`** — wraps the app inside `AuthProvider`. Fetches `/api/branding` for logged-in users, `/api/branding/public` for logged-out. Sets `--primary-color` / `--secondary-color` CSS vars on `:root`, toggles `dark` class on `<body>`, and updates `document.title`. Exposes `useBranding()` returning `{ branding, refresh, theme, toggleTheme }`.
+- **Theme priority**: `localStorage("theme")` (set by the toggle) > `branding.theme_mode` > "light". Once the user clicks the toggle, branding's `theme_mode` no longer overrides their choice.
+- **`components/ThemeToggle.tsx`** — Sun/Moon button in the Header, available to all roles (logged in or not).
+- **Branding settings page**: `/admin/company-settings/branding` — single page with App Settings + Login Page sections and a live Header + Login preview column. Replaced the prior modal on `/admin/companies` (which now links to this page).
+
+### Theme CSS Variables (`app/globals.css`)
+
+```css
+:root { --bg: #fff;    --text: #111827; --card: #f9fafb; --muted: #64748b; --border: #e2e8f0; }
+.dark { --bg: #111827; --text: #f9fafb; --card: #1f2937; --muted: #94a3b8; --border: #334155; }
+body  { background: var(--bg); color: var(--text); }
+```
+
+The `<body>` tag inherits all colors from these variables — no hardcoded `bg-slate-*` classes. Header and Branding page styles use inline `var(--card)` / `var(--text)` / `var(--border)` so dark mode flips instantly across the entire app. Utility classes available: `bg-app`, `bg-card`, `text-app`, `text-muted`, `border-app`, `bg-primary`, `text-primary`, `border-primary`, `bg-secondary`.
+
+### Sidebar Admin Menu
+
+Admin children are visually grouped via an optional `group` field on `NavChild`. Current grouping:
+
+```
+Users / Companies* / Roles / Groups / Functions / Departments / Countries
+
+  COMPANY SETTINGS
+    General*           → /admin/companies
+    Branding           → /admin/company-settings/branding
+    SharePoint Settings → /admin/sharepoint
+    DMS Settings       → /admin/dms-settings
+
+  MAIL SETTINGS
+    SMTP Settings      → /admin/smtp
+    Template Settings  → /admin/email-templates
+```
+
+`*` = SUPER_ADMIN only (existing `perm: "super_admin"` gate).
+
+### Rescue Script
+
+`scripts/reset-admin.ts` — force-resets `admin@local.com` / `Admin123` if seed `upsert(...update: {})` drift causes login failures.
+
+---
+
 ## Important Notes
 
 - **proxy.ts**: Next.js 16 uses `proxy.ts` (not `middleware.ts`). Default export required.
@@ -342,3 +422,6 @@ Compliance and AMC uploads **never** create DMS folder entries or check DMS perm
 - **Seeding**: `instrumentation.ts` runs `lib/seed.ts` on Node.js startup — seeds admin user, compliance template, AMC template, and all status records.
 - **Multi-tenancy**: All queries filter by `company_id` (except SUPER_ADMIN who sees all).
 - **`AMCApprovalLevel` vs `AMCApprovalMatrix`**: The workflow now uses `AMCApprovalLevel` (per-record). `AMCApprovalMatrix` is the legacy template-based model and is no longer used by the workflow.
+- **Branding logo storage**: Base64 in the DB — `lib/storage.ts` (SharePoint) is **not** used for branding. Branding works offline and without the DMS module.
+- **Public branding endpoint** returns the **first** `Branding` row (oldest by `created_at`) since the unauthenticated login page can't know which company is signing in. For multi-tenant login differentiation (e.g. by subdomain), this resolution layer would need to be added.
+- **Legacy duplication**: `Company` still has `logo_url` / `primary_color` / `secondary_color` columns from before the `Branding` table existed. They're unused by the new branding flow but not yet dropped.
