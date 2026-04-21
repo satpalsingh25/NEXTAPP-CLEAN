@@ -184,6 +184,22 @@ Every tenant can have a different set of modules enabled. Two tables drive this:
 
 **Naming caveat**: the existing `enum Module` (workflow tag on `Document`, `Notification`, etc.) was renamed to `enum ModuleType` to free up the name for the new `model Module`. Postgres data is preserved via `ALTER TYPE … RENAME` (no row rewrites).
 
+### Branding & Theming (`/admin/company-settings/branding`)
+
+Per-tenant branding stored in a single `Branding` row. **All images are stored as base64 `data:image/*` URIs in the database** — no SharePoint, no upload route, works offline.
+
+- **App Settings** — App Name (replaces "Compliance & AMC" in the sidebar header and login welcome), Browser Title (sets the browser tab title via `document.title`), Company Logo upload, Default Theme (light/dark)
+- **Login Page** — Login Banner image (shown above the Sign-In form), Footer Text (preserves line breaks, shown below the Sign-In button), Background (accepts a hex color like `#0f172a` **or** an uploaded image)
+- **Brand Colors** — Primary and Secondary hex colors, applied app-wide via `--primary-color` / `--secondary-color` CSS variables
+- **Live Preview column** — mini Header preview and mini Login preview update instantly as you type or upload, before saving
+- **Patch-style save** — `POST /api/branding` writes only fields present in the body, so each section can be saved independently
+- **Public branding endpoint** — `GET /api/branding/public` (unauthenticated) returns the safe subset for the login page; the login page reads it on every load
+- **Per-user theme toggle** — Sun/Moon button in the Header lets each user override the company default; selection is persisted in `localStorage` and survives logout
+- **Server-side limits** — image fields capped at ~2 MB of base64; text fields capped at 500 chars
+- **Rescue script** — `npx tsx scripts/reset-admin.ts` force-resets `admin@local.com` / `Admin123` if the seed `upsert` ever drifts and locks you out
+
+The `<body>` tag uses CSS variables (`--bg`, `--text`, `--card`, `--muted`, `--border`) defined in `app/globals.css`, with `.dark` overrides — so toggling the theme flips colors across the entire app instantly with no reload.
+
 ### Admin — Template Management
 - **Compliance Templates** — define the title, frequency (`MONTHLY / QUARTERLY / YEARLY`), start date, due day, reminder days, and approval levels
 - **AMC Templates** — same configuration for AMC records
@@ -501,7 +517,9 @@ app/
 │   ├── templates/              # Compliance & AMC templates
 │   ├── approval-matrix/        # Per-record approver assignment
 │   ├── smtp/                   # SMTP configuration
-│   └── email-templates/        # Dynamic email template editor
+│   ├── email-templates/        # Dynamic email template editor
+│   └── company-settings/
+│       └── branding/           # Per-tenant branding: app name, logos, login page, theme colors
 ├── api/
 │   ├── auth/                   # Login, logout, /me
 │   ├── compliance/             # CRUD + submit + my-tasks
@@ -528,6 +546,8 @@ app/
 │   │   │   └── [id]/           # PUT update, DELETE remove
 │   │   ├── dms-sync/           # POST — sync SharePoint folder tree into DB
 │   │   └── ...                 # Users, companies, departments, templates
+│   ├── branding/               # GET/POST authenticated branding
+│   │   └── public/             # GET — unauthenticated branding for the login page
 │   └── cron/                   # GET — manual trigger for all engines
 components/
 ├── NotificationBell.tsx        # Bell icon, unread badge, dropdown, mark-as-read
@@ -589,6 +609,7 @@ instrumentation.ts              # Next.js startup hook — runs seed + startCron
 | `Module` | Master list of gateable modules (AMC, Compliance, DMS) for multi-tenant feature gating |
 | `CompanyModule` | Per-tenant enable/disable flag — `(company_id, module_id) → enabled: boolean` |
 | `Document` | Unified file metadata for Compliance and AMC uploads — `module: ModuleType`, `record_id`, `file_path` |
+| `Branding` | Per-tenant branding — `app_name`, `browser_title`, `logo_base64`, `login_banner`, `login_footer`, `login_bg`, `primary_color`, `secondary_color`, `theme_mode` (all images base64, no SharePoint) |
 
 ---
 
