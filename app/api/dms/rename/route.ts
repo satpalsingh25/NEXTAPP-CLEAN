@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth.server";
 import type { AuthUser } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { getDriveId, getSharePointToken, checkSharePointConfigured } from "@/lib/sharepoint-check";
+import { logDmsActivity } from "@/lib/dms-activity";
 
 /* Characters forbidden in folder/file names */
 const INVALID_NAME_RE = /[/\\?%*:|"<>]/;
@@ -154,6 +155,15 @@ async function renameFolder(user: AuthUser, id: string, trimmedName: string) {
     });
   }
 
+  void logDmsActivity({
+    company_id, user_id,
+    action:      "RENAME",
+    entity_type: "folder",
+    entity_id:   id,
+    entity_name: trimmedName,
+    details:     { old_name: folder.name, new_name: trimmedName },
+  });
+
   return NextResponse.json({ success: true });
 }
 
@@ -222,6 +232,15 @@ async function renameFile(user: AuthUser, id: string, trimmedName: string) {
   await prisma.dmsDocument.update({
     where: { id },
     data:  { name: trimmedName },
+  });
+
+  void logDmsActivity({
+    company_id, user_id,
+    action:      "RENAME",
+    entity_type: "file",
+    entity_id:   id,
+    entity_name: trimmedName,
+    details:     { old_name: doc.name, new_name: trimmedName },
   });
 
   return NextResponse.json({ success: true });

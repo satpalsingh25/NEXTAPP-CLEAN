@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
+import { logDmsActivity } from "@/lib/dms-activity";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -77,6 +78,14 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   /* Delete the folder record */
   await prisma.dmsFolder.delete({ where: { id } });
+
+  void logDmsActivity({
+    company_id, user_id: auth.user.user_id,
+    action:      "DELETE",
+    entity_type: "folder",
+    entity_id:   id,
+    entity_name: folder.name,
+  });
 
   return NextResponse.json({ success: true });
 }

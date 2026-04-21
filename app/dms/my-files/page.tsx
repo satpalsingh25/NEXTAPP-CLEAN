@@ -6,7 +6,7 @@ import {
   Upload, FolderPlus, RefreshCw, AlertCircle,
   Folder, FileText, Download, FolderOpen,
   X, Loader2, HardDrive, Eye,
-  FileX, List, LayoutGrid, Pencil, Trash2, CheckSquare2, Square,
+  FileX, List, LayoutGrid, Pencil, Trash2, CheckSquare2, Square, History,
 } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -79,6 +79,7 @@ function ContextMenuPopup({
   onUpload,
   onNewFolder,
   onRename,
+  onActivity,
   onDelete,
   onClose,
 }: {
@@ -87,6 +88,7 @@ function ContextMenuPopup({
   onUpload:    () => void;
   onNewFolder: () => void;
   onRename:    () => void;
+  onActivity:  () => void;
   onDelete:    () => void;
   onClose:     () => void;
 }) {
@@ -125,6 +127,7 @@ function ContextMenuPopup({
       icon: <FolderPlus size={13}/>,
       label: "New Folder",                                    action: onNewFolder },
     { show: access.can_write,  icon: <Pencil  size={13}/>, label: "Rename",   action: onRename },
+    { show: true,              icon: <History size={13}/>, label: "Activity",  action: onActivity },
     { show: access.can_delete, icon: <Trash2  size={13}/>, label: "Delete",   action: onDelete, danger: true },
   ].filter((i) => i.show);
 
@@ -305,6 +308,132 @@ function DeleteModal({
   );
 }
 
+/* ─── Activity Log Modal ─────────────────────────────────────────────────── */
+
+interface ActivityEntry {
+  id:          string;
+  user:        string;
+  action:      string;
+  entity_type: string;
+  entity_name: string;
+  created_at:  string;
+  details:     { old_name?: string; new_name?: string } | null;
+}
+
+function formatAction(entry: ActivityEntry): string {
+  switch (entry.action) {
+    case "CREATE_FOLDER": return `created folder "${entry.entity_name}"`;
+    case "UPLOAD_FILE":   return `uploaded "${entry.entity_name}"`;
+    case "DELETE":        return `deleted ${entry.entity_type} "${entry.entity_name}"`;
+    case "RENAME":
+      return entry.details?.old_name
+        ? `renamed "${entry.details.old_name}" → "${entry.details.new_name ?? entry.entity_name}"`
+        : `renamed to "${entry.entity_name}"`;
+    case "DOWNLOAD":      return `downloaded "${entry.entity_name}"`;
+    default:              return `${entry.action.toLowerCase()} "${entry.entity_name}"`;
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  if (mins < 1)   return "just now";
+  if (mins < 60)  return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function ActivityModal({
+  target,
+  onClose,
+}: {
+  target:  { id: string; name: string; kind: "folder" | "file" };
+  onClose: () => void;
+}) {
+  const [logs,    setLogs]    = useState<ActivityEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res  = await fetch(
+          `/api/dms/activity?entity_id=${target.id}&limit=20`,
+          { credentials: "include" },
+        );
+        const json = await res.json();
+        if (!res.ok) { setError(json.error ?? "Failed to load activity."); return; }
+        setLogs(json);
+      } catch {
+        setError("Network error.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    void load();
+  }, [target.id]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <History size={16} className="text-slate-500"/>
+            <h2 className="text-base font-bold text-slate-900">Activity Log</h2>
+          </div>
+          <p className="text-xs text-slate-400 mr-2 truncate max-w-[160px]">{target.name}</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
+            <X size={15}/>
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-4 space-y-1">
+          {loading && (
+            <div className="flex justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-slate-400"/>
+            </div>
+          )}
+          {error && (
+            <p className="text-xs text-red-600 flex items-center gap-1.5 py-4 justify-center">
+              <AlertCircle size={12}/> {error}
+            </p>
+          )}
+          {!loading && !error && logs.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">No activity recorded yet.</p>
+          )}
+          {!loading && logs.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-xs font-bold text-blue-600">
+                  {entry.user.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-slate-700">
+                  <span className="font-semibold">{entry.user}</span>{" "}
+                  {formatAction(entry)}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{timeAgo(entry.created_at)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── File Preview Modal ─────────────────────────────────────────────────── */
 
 function FilePreviewModal({ file, onClose }: { file: DmsFile; onClose: () => void }) {
@@ -457,6 +586,7 @@ export default function DmsMyFilesPage() {
   const [ctxMenu,     setCtxMenu]     = useState<CtxMenu | null>(null);
   const [renameTarget,      setRenameTarget]      = useState<{ id: string; name: string; kind: "folder" | "file" } | null>(null);
   const [deleteTarget,      setDeleteTarget]      = useState<{ id: string; name: string; kind: "folder" | "file" } | null>(null);
+  const [activityTarget,    setActivityTarget]    = useState<{ id: string; name: string; kind: "folder" | "file" } | null>(null);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
   const [rowPerms,          setRowPerms]          = useState<Record<string, FolderAccess>>({});
 
@@ -695,6 +825,11 @@ export default function DmsMyFilesPage() {
   function ctxDelete() {
     if (!ctxMenu) return;
     setDeleteTarget({ id: ctxMenu.item.id, name: ctxMenu.item.name, kind: ctxMenu.kind });
+  }
+
+  function ctxActivity() {
+    if (!ctxMenu) return;
+    setActivityTarget({ id: ctxMenu.item.id, name: ctxMenu.item.name, kind: ctxMenu.kind });
   }
 
   function ctxNewFolder() {
@@ -1143,6 +1278,7 @@ export default function DmsMyFilesPage() {
           onUpload={ctxUpload}
           onNewFolder={ctxNewFolder}
           onRename={ctxRename}
+          onActivity={ctxActivity}
           onDelete={ctxDelete}
           onClose={() => setCtxMenu(null)}
         />
@@ -1165,6 +1301,14 @@ export default function DmsMyFilesPage() {
           kind={deleteTarget.kind}
           onClose={() => setDeleteTarget(null)}
           onDeleted={applyDelete}
+        />
+      )}
+
+      {/* ── Activity Log Modal ── */}
+      {activityTarget && (
+        <ActivityModal
+          target={activityTarget}
+          onClose={() => setActivityTarget(null)}
         />
       )}
 

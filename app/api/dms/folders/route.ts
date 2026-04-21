@@ -4,6 +4,7 @@ import { requireAuth, requireRole, ADMIN_ONLY } from "@/lib/auth.server";
 import { createFolder } from "@/lib/sharepoint-check";
 import { ensureCompanyRootFolder } from "@/lib/dms-company-root";
 import { buildFolderPath } from "@/lib/dms-folder-path";
+import { logDmsActivity } from "@/lib/dms-activity";
 
 /* Build breadcrumb trail by walking up the parent chain */
 async function buildBreadcrumbs(
@@ -153,6 +154,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    void logDmsActivity({
+      company_id, user_id,
+      action:      "CREATE_FOLDER",
+      entity_type: "folder",
+      entity_id:   folder.id,
+      entity_name: folder.name,
+    });
+
     return NextResponse.json(folder, { status: 201 });
   }
 
@@ -223,6 +232,14 @@ export async function POST(req: NextRequest) {
     console.error("[POST /api/dms/folders] SharePoint createFolder failed:", { company_id, folderPath, message });
     return NextResponse.json({ error: message }, { status: 502 });
   }
+
+  void logDmsActivity({
+    company_id, user_id,
+    action:      "CREATE_FOLDER",
+    entity_type: "folder",
+    entity_id:   folder.id,
+    entity_name: folder.name,
+  });
 
   return NextResponse.json(folder, { status: 201 });
 }

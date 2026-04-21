@@ -1,0 +1,152 @@
+Implement lightweight Activity Log for DMS actions.
+
+----------------------------------------
+DATABASE
+----------------------------------------
+
+Add new model:
+
+model DmsActivityLog {
+  id           String   @id @default(uuid())
+  company_id   String
+  user_id      String
+  action       String
+  entity_type  String   // "folder" | "file"
+  entity_id    String
+  entity_name  String
+  details      String?  // optional JSON string
+  created_at   DateTime @default(now())
+}
+
+----------------------------------------
+LOG FUNCTION (COMMON)
+----------------------------------------
+
+Create utility:
+
+logDmsActivity({
+  company_id,
+  user_id,
+  action,
+  entity_type,
+  entity_id,
+  entity_name,
+  details
+})
+
+Inside:
+→ prisma.dmsActivityLog.create()
+
+----------------------------------------
+TRACK ACTIONS
+----------------------------------------
+
+Call log function in:
+
+1. Folder create
+   action = "CREATE_FOLDER"
+
+2. File upload
+   action = "UPLOAD_FILE"
+
+3. Rename (file/folder)
+   action = "RENAME"
+
+4. Delete (file/folder)
+   action = "DELETE"
+
+5. Download (optional)
+   action = "DOWNLOAD"
+
+----------------------------------------
+DETAILS FIELD (OPTIONAL)
+----------------------------------------
+
+Store JSON string like:
+
+{
+  "old_name": "ABC",
+  "new_name": "XYZ"
+}
+
+----------------------------------------
+API
+----------------------------------------
+
+Create:
+
+GET /api/dms/activity
+
+Query:
+• entity_id (optional)
+• limit (default 20)
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+Return latest logs:
+
+orderBy: created_at desc
+
+Include:
+• user name (join user table)
+
+----------------------------------------
+RESPONSE
+----------------------------------------
+
+[
+  {
+    user: "Satpal",
+    action: "RENAME",
+    entity_name: "Invoice.pdf",
+    created_at: "...",
+    details: {...}
+  }
+]
+
+----------------------------------------
+FRONTEND
+----------------------------------------
+
+1. Add "Activity" option in right-click menu
+
+2. On click:
+   → open modal
+
+----------------------------------------
+MODAL UI
+----------------------------------------
+
+Title: Activity Log
+
+List:
+
+• Satpal renamed "Invoice.pdf"
+• Raj uploaded "Report.xlsx"
+• Admin deleted "Folder A"
+
+----------------------------------------
+FORMAT
+----------------------------------------
+
+✔ Show:
+   user + action + name + time
+
+✔ Optional:
+   show rename details
+
+----------------------------------------
+LIMIT
+----------------------------------------
+
+Show last 20 records
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Existing logic
+• Permissions
+• SharePoint

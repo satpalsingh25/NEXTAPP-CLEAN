@@ -475,6 +475,21 @@ model FolderPermission {
   created_at  DateTime @default(now())
 }
 
+model DmsActivityLog {
+  id          String   @id @default(uuid())
+  company_id  String
+  user_id     String
+  action      String   // CREATE_FOLDER | UPLOAD_FILE | RENAME | DELETE | DOWNLOAD
+  entity_type String   // "folder" | "file"
+  entity_id   String
+  entity_name String
+  details     String?  // optional JSON string e.g. {"old_name":"A","new_name":"B"}
+  created_at  DateTime @default(now())
+
+  @@index([company_id, created_at])
+  @@index([entity_id])
+}
+
 // DMS document — distinct from the existing Document model (compliance/AMC file attachments)
 model DmsDocument {
   id                  String   @id @default(uuid())

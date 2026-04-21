@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth.server";
 import { validateUpload } from "@/lib/dms-validation";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
+import { logDmsActivity } from "@/lib/dms-activity";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/upload                                                 */
@@ -153,6 +154,14 @@ export async function POST(req: NextRequest) {
         sharepoint_item_id: spItemId,
         drive_id,
       },
+    });
+
+    void logDmsActivity({
+      company_id, user_id,
+      action:      "UPLOAD_FILE",
+      entity_type: "file",
+      entity_id:   doc.id,
+      entity_name: doc.name,
     });
 
     uploaded.push({
