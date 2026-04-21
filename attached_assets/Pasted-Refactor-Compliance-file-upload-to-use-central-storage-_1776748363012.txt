@@ -1,0 +1,96 @@
+Refactor Compliance file upload to use central storage service.
+
+----------------------------------------
+STEP 1 — IMPORT STORAGE SERVICE
+----------------------------------------
+
+import { uploadFile } from "@/lib/storage"
+
+----------------------------------------
+STEP 2 — FIND EXISTING UPLOAD LOGIC
+----------------------------------------
+
+Locate API:
+
+POST /api/compliance/upload
+OR wherever evidence file is uploaded
+
+----------------------------------------
+STEP 3 — REMOVE OLD LOGIC
+----------------------------------------
+
+❌ Remove:
+• direct SharePoint upload calls
+• any DMS-specific upload usage
+
+----------------------------------------
+STEP 4 — USE STORAGE SERVICE
+----------------------------------------
+
+Replace with:
+
+const result = await uploadFile({
+  file,
+  fileName: file.name,
+  mimeType: file.type,
+  company_id,
+  user_id,
+  module: "COMPLIANCE",
+  record_id: compliance_id
+})
+
+----------------------------------------
+STEP 5 — SAVE METADATA
+----------------------------------------
+
+Store in DB:
+
+await prisma.document.create({
+  data: {
+    compliance_id,
+    file_name: result.name,
+    file_path: result.path,
+    mime_type: result.mimeType,
+    size: result.size,
+    uploaded_by: user_id
+  }
+})
+
+----------------------------------------
+STEP 6 — MULTIPLE FILE SUPPORT
+----------------------------------------
+
+Loop through files:
+
+for (const file of files) {
+  await uploadFile(...)
+}
+
+----------------------------------------
+STEP 7 — RESPONSE
+----------------------------------------
+
+return { success: true }
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Do NOT create DMS folder entry
+✔ Do NOT depend on DMS permissions
+✔ Only store document record
+
+----------------------------------------
+VALIDATION
+----------------------------------------
+
+✔ File required
+✔ compliance_id required
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Compliance workflow
+• Approval logic
+• UI forms
