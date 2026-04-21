@@ -162,7 +162,27 @@ Seven roles enforced at both UI and API level:
 - **Edit** company name and details inline
 - **Disable / Enable** toggle — sets the `is_active` flag without deleting any data
 - **Delete** — blocked server-side if the company has linked users, compliance records, or AMC records
+- **Manage Modules** (Super Admin only) — per-company modal lists every module (AMC, Compliance, DMS) with an enable/disable checkbox. Disabling a module hides it from the sidebar and blocks all of its API routes; existing data is preserved and reappears when re-enabled
 - Super Admin can view and manage all companies across the platform
+
+### Module Access Control (Multi-Tenant Feature Gating)
+
+Every tenant can have a different set of modules enabled. Two tables drive this:
+
+| Table | Purpose |
+|---|---|
+| `Module` | Master list of all gateable modules (`AMC`, `COMPLIANCE`, `DMS`) — seeded by `scripts/seed-modules.ts` |
+| `CompanyModule` | Per-tenant flag — `(company_id, module_id) → enabled: boolean` |
+
+**Default-allow behavior**: when no `CompanyModule` row exists for a tenant + module, the module is treated as **enabled**. This means existing tenants continue to work without any data migration; opt-out is explicit.
+
+**Where it is enforced**:
+
+- **API routes** — every AMC / Compliance / DMS route calls `gateModule(req, "AMC" | "COMPLIANCE" | "DMS")` right after `requireAuth`. Returns `403` for disabled modules. Auth, Company, and Admin routes are intentionally never gated.
+- **Sidebar UI** — `components/Sidebar.tsx` calls `GET /api/modules` on mount and hides any nav entry whose module is disabled for the current tenant.
+- **Super-Admin assignment UI** — the **Manage Modules** modal on `/admin/companies` reads/writes via `GET /api/admin/company-modules?company_id=…` and `POST /api/admin/company-modules` (SUPER_ADMIN only).
+
+**Naming caveat**: the existing `enum Module` (workflow tag on `Document`, `Notification`, etc.) was renamed to `enum ModuleType` to free up the name for the new `model Module`. Postgres data is preserved via `ALTER TYPE … RENAME` (no row rewrites).
 
 ### Admin — Template Management
 - **Compliance Templates** — define the title, frequency (`MONTHLY / QUARTERLY / YEARLY`), start date, due day, reminder days, and approval levels
@@ -331,6 +351,61 @@ npx tsx scripts/fix-folder-paths.ts
 
 ---
 
+## Central Storage Service (`lib/storage.ts`)
+
+A single entry point for **all** SharePoint file uploads across DMS, Compliance, and AMC. Every module upload route delegates here — no scattered `fetch` calls to Graph from individual routes.
+
+### `uploadFile(input)`
+
+```ts
+const result = await uploadFile({
+  file,                          // Web API File
+  fileName,                      // explicit name (may differ from file.name)
+  mimeType,                      // e.g. "application/pdf"
+  company_id,
+  user_id,
+  module:    "DMS" | "AMC" | "COMPLIANCE",
+  record_id?: string,            // required for AMC and COMPLIANCE
+  parent_path?: string,          // DMS only — DmsFolder.path of target
+});
+// → { name, path, mimeType, size, sharePointItemId, webUrl }
+```
+
+### Path Construction
+
+All names are **slugified** (whitespace → `_`, special chars stripped) — never raw UUIDs.
+
+| Module | SharePoint path |
+|---|---|
+| DMS (with `parent_path`) | `/Company/{co_slug}/{parent_path}/{filename}` |
+| DMS (My Files root) | `/Company/{co_slug}/Users/{user_slug}/{filename}` |
+| COMPLIANCE | `/Company/{co_slug}/Compliance/{record_id}/{filename}` |
+| AMC | `/Company/{co_slug}/AMC/{record_id}/{filename}` |
+
+Examples: `/Company/ABC_Ltd/Users/Satpal/Invoice.pdf` · `/Company/ABC_Ltd/Compliance/1234/report.pdf`
+
+### Base Folder Bootstrap
+
+Before each upload, `ensureSharePointFolder()` is called sequentially for the base tree (parent before child) so the structure exists in SharePoint:
+
+```
+Company/
+Company/{co_slug}/
+Company/{co_slug}/{Users,TeamFolder,Compliance,AMC}/
+```
+
+`GET` first; on `404` a `POST` with `conflictBehavior: "replace"` creates it (race-safe). Non-404 errors are warned but not fatal — the upload `PUT` will surface real failures.
+
+### Module Upload Endpoints
+
+- **DMS** (`/api/dms/upload`) — keeps its own DMS-specific logic (settings validation, folder permissions, `DmsDocument` row, activity log) but builds paths via the central service contract
+- **Compliance** (`/api/compliance/[id]/upload`) — multipart, validates record + tenant, loops files, persists each as `Document { module: "COMPLIANCE", record_id, file_path, … }`
+- **AMC** (`/api/amc/[id]/upload`) — same shape, `module: "AMC"`
+
+Compliance and AMC uploads **never** touch DMS folders or permissions.
+
+---
+
 ## Automation Engine
 
 All automated processes run daily at **01:00 server time** via a `node-cron` scheduler registered on startup. They can also be triggered instantly via `GET /api/cron` for testing.
@@ -460,7 +535,7 @@ components/
 ├── Sidebar.tsx                 # App-wide navigation
 └── ui/                         # shadcn component library
 lib/
-├── auth.server.ts              # JWT verification + role guards
+├── auth.server.ts              # JWT verification + role guards (requireAuth, requireRole)
 ├── cron.ts                     # node-cron scheduler (daily at 01:00)
 ├── dms-company-root.ts         # ensureCompanyRootFolder() — DB check → SP GET → SP POST → DB insert
 ├── dms-folder-path.ts          # buildFolderPath() — single source of truth for all DMS paths
@@ -469,6 +544,7 @@ lib/
 ├── email-template.ts           # Template resolver with {{variable}} interpolation
 ├── escalation.ts               # Escalation engine — notifies admins on breach
 ├── generator.ts                # Recurring compliance record generator
+├── module-access.ts            # hasModuleAccess / requireModuleAccess / gateModule — multi-tenant feature gating
 ├── notification.ts             # DB + email notification helper (with deep link support)
 ├── overdue.ts                  # Bulk overdue status updater
 ├── prisma.ts                   # Prisma client singleton
@@ -476,9 +552,12 @@ lib/
 ├── seed.ts                     # Database seed (idempotent upserts)
 ├── sharepoint-check.ts         # SharePoint helpers — token, site/drive ID, folder create
 ├── smtp-crypto.ts              # AES-256-CBC encrypt/decrypt for SMTP password
+├── storage.ts                  # Central upload service — uploadFile() + ensureSharePointFolder() for DMS/AMC/Compliance
 └── seedStatuses.ts             # Status master seeding utility
 scripts/
-└── fix-folder-paths.ts         # One-time migration: replace legacy slug paths with correct format
+├── fix-folder-paths.ts         # One-time migration: replace legacy slug paths with correct format
+├── seed-modules.ts             # Seed the Module master with AMC, COMPLIANCE, DMS rows
+└── reset-admin.ts              # Force-reset the SUPER_ADMIN password to a known value (rescue script)
 prisma/
 └── schema.prisma               # Full data model
 instrumentation.ts              # Next.js startup hook — runs seed + startCron()
@@ -507,6 +586,9 @@ instrumentation.ts              # Next.js startup hook — runs seed + startCron
 | `DmsFolder` | DMS folder tree — `path`, `type` (`SYSTEM`/`USER`), `parent_id`, `company_id` |
 | `DmsDocument` | DMS file metadata — `name`, `file_url`, `folder_path`, `sharepoint_item_id`, `drive_id`, `company_id` |
 | `DmsFolderPermission` | Per-folder ACL — links users/groups to `can_read`, `can_upload`, `can_write`, `can_delete` |
+| `Module` | Master list of gateable modules (AMC, Compliance, DMS) for multi-tenant feature gating |
+| `CompanyModule` | Per-tenant enable/disable flag — `(company_id, module_id) → enabled: boolean` |
+| `Document` | Unified file metadata for Compliance and AMC uploads — `module: ModuleType`, `record_id`, `file_path` |
 
 ---
 
