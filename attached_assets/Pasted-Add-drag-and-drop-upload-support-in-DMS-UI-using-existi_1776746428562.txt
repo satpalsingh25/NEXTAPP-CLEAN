@@ -1,0 +1,111 @@
+Add drag-and-drop upload support in DMS UI using existing upload API.
+
+----------------------------------------
+FRONTEND ONLY
+----------------------------------------
+
+1. Identify main container:
+
+The area where folders/files are listed
+
+----------------------------------------
+ADD EVENTS
+----------------------------------------
+
+onDragOver
+onDragLeave
+onDrop
+
+----------------------------------------
+STATE
+----------------------------------------
+
+const [isDragging, setIsDragging] = useState(false)
+
+----------------------------------------
+HANDLERS
+----------------------------------------
+
+onDragOver:
+  e.preventDefault()
+  setIsDragging(true)
+
+onDragLeave:
+  setIsDragging(false)
+
+onDrop:
+  e.preventDefault()
+  setIsDragging(false)
+
+  const files = Array.from(e.dataTransfer.files)
+
+  call handleUpload(files)
+
+----------------------------------------
+UPLOAD FUNCTION
+----------------------------------------
+
+Reuse existing upload API:
+
+POST /api/dms/upload
+
+For each file:
+• append file
+• append parent_id (current folder)
+
+----------------------------------------
+UI OVERLAY
+----------------------------------------
+
+When isDragging = true:
+
+Show overlay:
+
+-------------------------
+|  Drop files here 📁   |
+-------------------------
+
+Style:
+• light background
+• dashed border
+
+----------------------------------------
+MULTIPLE FILES
+----------------------------------------
+
+✔ Allow multiple files upload
+
+----------------------------------------
+PROGRESS (OPTIONAL LIGHT)
+----------------------------------------
+
+✔ Show simple loader or "Uploading..."
+
+----------------------------------------
+ERROR HANDLING
+----------------------------------------
+
+If upload fails:
+✔ show toast: "Upload failed"
+
+----------------------------------------
+REFRESH
+----------------------------------------
+
+After upload:
+✔ reload current folder
+
+----------------------------------------
+RESTRICTIONS
+----------------------------------------
+
+✔ Ignore folders for now (files only)
+✔ No change to backend
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Upload API
+• SharePoint integration
+• Permissions

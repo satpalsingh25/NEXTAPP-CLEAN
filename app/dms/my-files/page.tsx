@@ -579,6 +579,7 @@ export default function DmsMyFilesPage() {
   const [uploading,     setUploading]     = useState(false);
   const [uploadError,   setUploadError]   = useState("");
   const [uploadDone,    setUploadDone]    = useState(false);
+  const [isDragging,    setIsDragging]    = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
 
   const [viewMode,    setViewMode]    = useState<ViewMode>("list");
@@ -777,6 +778,50 @@ export default function DmsMyFilesPage() {
     }
   }
 
+  /* ── drag-and-drop upload ── */
+  async function handleDropUpload(files: File[]) {
+    const targetId = currentFolder?.id;
+    if (!files.length || !targetId) return;
+
+    setUploading(true); setUploadError(""); setUploadDone(false);
+    const form = new FormData();
+    form.append("folder_id", targetId);
+    for (const file of files) form.append("file", file);
+
+    try {
+      const res  = await fetch("/api/dms/upload", { method: "POST", credentials: "include", body: form });
+      const json = await res.json();
+      if (!res.ok) { setUploadError(json.error ?? "Upload failed."); return; }
+      setUploadDone(true);
+      setTimeout(() => setUploadDone(false), 3000);
+      if (currentFolderId) loadContents(currentFolderId);
+    } catch {
+      setUploadError("Network error. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    if (currentFolder) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!currentFolder) return;
+    const files = Array.from(e.dataTransfer.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length) void handleDropUpload(files);
+  }
+
   /* ── right-click / context menu ── */
   async function handleContextMenu(
     e: React.MouseEvent,
@@ -877,7 +922,22 @@ export default function DmsMyFilesPage() {
   /* Render                                                             */
   /* ═══════════════════════════════════════════════════════════════════ */
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* ── Drag-and-drop overlay ── */}
+      {isDragging && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-400 bg-blue-50/80 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-3 text-blue-600">
+            <Upload size={36} strokeWidth={1.5}/>
+            <p className="text-base font-semibold">Drop files here to upload</p>
+            <p className="text-xs text-blue-400">Files will be added to the current folder</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
