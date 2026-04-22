@@ -54,7 +54,6 @@ model Company {
   documents            Document[]
   company_modules      CompanyModule[]
   approval_logs        ApprovalLog[]
-  audit_logs           AuditLog[]
   country_id           String?            @db.Uuid
   country              Country?           @relation(fields: [country_id], references: [id])
   departments          Department[]
@@ -110,7 +109,6 @@ model User {
   group               Group?            @relation("GroupMembers", fields: [group_id], references: [id])
   owned_groups           Group[]           @relation("GroupOwner")
   created_at             DateTime          @default(now())
-  audit_logs             AuditLog[]
   assigned_compliances   Compliance[]      @relation("ComplianceAssignedUser")
   assigned_amcs          AMC[]             @relation("AMCAssignedUser")
   amc_approval_levels    AMCApprovalLevel[]
@@ -305,18 +303,15 @@ model ApprovalLog {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  company_id  String   @db.Uuid
-  company     Company  @relation(fields: [company_id], references: [id])
-  user_id     String   @db.Uuid
-  user        User     @relation(fields: [user_id], references: [id])
-  action_type String
-  module      ModuleType
-  record_id   String   @db.Uuid
-  old_value   Json?
-  new_value   Json?
-  ip_address  String?
-  timestamp   DateTime @default(now())
+  id          String   @id @default(uuid())
+  company_id  String
+  user_id     String?
+  action      String
+  module      String
+  entity_type String?
+  entity_id   String?
+  description String?
+  created_at  DateTime @default(now())
 }
 
 model Department {
