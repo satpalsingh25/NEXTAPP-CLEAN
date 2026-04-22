@@ -12,13 +12,14 @@ A production-ready, multi-tenant **Compliance and AMC (Annual Maintenance Contra
 4. [Feature List](#feature-list)
 5. [Document Management System (DMS)](#document-management-system-dms)
 6. [Automation Engine](#automation-engine)
-7. [App Structure](#app-structure)
-8. [Database Schema](#database-schema)
-9. [Role Reference](#role-reference)
-10. [Approval Workflow](#approval-workflow)
-11. [Deployment Guide](#deployment-guide)
-12. [Environment Variables](#environment-variables)
-13. [Security Notes](#security-notes)
+7. [Audit Log System](#audit-log-system)
+8. [App Structure](#app-structure)
+9. [Database Schema](#database-schema)
+10. [Role Reference](#role-reference)
+11. [Approval Workflow](#approval-workflow)
+12. [Deployment Guide](#deployment-guide)
+13. [Environment Variables](#environment-variables)
+14. [Security Notes](#security-notes)
 
 ---
 
@@ -38,7 +39,7 @@ This platform centralises compliance obligations and annual maintenance contract
 - **Real-time notification bell** — in-app bell icon in the top navbar with unread count badge, dropdown list, mark-as-read, and direct links to the related compliance or AMC record
 - **Role-based visibility and actions** — a regular user creates and submits; an approver approves or rejects; an admin manages templates, users, and matrices
 - **Multi-tenant isolation** — each company's data is fully separated; one deployment serves multiple organisations
-- A full **audit trail** of every workflow action
+- A full **audit trail** of every workflow action, with a searchable admin UI for reviewing DMS and admin events
 
 ---
 
@@ -493,6 +494,88 @@ Runs all four engines immediately. Requires no authentication (internal use / ad
 
 ---
 
+## Audit Log System
+
+A lightweight, fire-and-forget audit trail that records security- and data-significant events across the system. Designed to never block request handlers and never throw — a log failure never surfaces to the end user.
+
+### Schema (`AuditLog` model)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `String @id @default(uuid())` | |
+| `company_id` | `String` | Tenant scope — bare foreign key, no Prisma relation (avoids cascade noise) |
+| `user_id` | `String?` | Acting user — nullable (system actions) |
+| `action` | `String` | Verb: `CREATE`, `UPDATE`, `DELETE`, `DOWNLOAD`, `UPLOAD`, `SUBMIT`, `APPROVE`, `REJECT`, `PERMISSION_UPDATE`, `LOGIN`, `LOGOUT`, etc. |
+| `module` | `String` | Source module: `DMS`, `COMPLIANCE`, `AMC`, `ADMIN`, `AUTH` |
+| `entity_type` | `String?` | What was acted on: `FOLDER`, `FILE`, `USER`, `BRANDING`, etc. |
+| `entity_id` | `String?` | ID of the affected record |
+| `description` | `String?` | Human-readable summary |
+| `created_at` | `DateTime @default(now())` | |
+
+No `@relation` fields — no cascade deletes, no foreign key drift, no join pressure.
+
+### Helper (`lib/audit-log.ts`)
+
+```typescript
+import { logAudit } from "@/lib/audit-log";
+
+await logAudit({
+  company_id,
+  user_id,
+  action:      "UPLOAD",
+  module:      "DMS",
+  entity_type: "FILE",
+  entity_id:   document.id,
+  description: `Uploaded "${fileName}" to ${folderPath}`,
+});
+```
+
+- **Fire-and-forget**: wrapped in a `try/catch` that only `console.error`s on failure — never throws, never awaited as a blocker.
+- **Named Prisma import**: uses `import { prisma } from "@/lib/prisma"` (not the default export).
+
+### What Is Logged
+
+| Module | Events |
+|---|---|
+| **DMS** | Create folder, rename folder, delete folder, upload file, download file, delete file, rename file, update folder permissions |
+| **Admin** | Update branding, create user, update user |
+| **Auth** | Login, logout (future-ready hookpoints) |
+
+### API (`GET /api/audit-logs`)
+
+Authentication: `ADMIN+` only. All results are automatically scoped to the caller's `company_id`.
+
+| Query param | Type | Description |
+|---|---|---|
+| `module` | string | Filter to a specific module (`DMS`, `ADMIN`, etc.) |
+| `action` | string | Filter to a specific action verb |
+| `user_id` | string | Filter to a specific acting user |
+| `from` | ISO date | Inclusive start of date range |
+| `to` | ISO date | Inclusive end of date range |
+| `page` | number | 1-based page number (default 1) |
+| `limit` | number | Records per page (default 50, max 200) |
+
+Response shape:
+```json
+{
+  "data": [ { ...auditLog, "user_name": "Full Name" } ],
+  "total": 342,
+  "page": 1,
+  "limit": 50
+}
+```
+
+User names are batch-fetched in one extra query and merged in memory — no N+1 problem.
+
+### Admin UI (`/admin/audit-logs`)
+
+- **Filter bar** — Module dropdown, Action dropdown, date range pickers (From / To), and a User search field
+- **Colored action badges** — green for safe reads (DOWNLOAD, VIEW), amber for mutations (CREATE, UPDATE, RENAME, PERMISSION_UPDATE), red for destructive actions (DELETE), blue for workflow actions (SUBMIT, APPROVE, REJECT)
+- **Paginated table** — displays actor name, module, action badge, entity type + ID, description, and timestamp; page controls with Previous / Next
+- **Sidebar placement** — listed under the `SYSTEM` group in the Admin sidebar (visible to ADMIN+ only)
+
+---
+
 ## App Structure
 
 ```
@@ -518,6 +601,7 @@ app/
 │   ├── approval-matrix/        # Per-record approver assignment
 │   ├── smtp/                   # SMTP configuration
 │   ├── email-templates/        # Dynamic email template editor
+│   ├── audit-logs/             # Audit log viewer: module/action/user/date filters, colored badges, pagination
 │   └── company-settings/
 │       └── branding/           # Per-tenant branding: app name, logos, login page, theme colors
 ├── api/
@@ -548,6 +632,7 @@ app/
 │   │   └── ...                 # Users, companies, departments, templates
 │   ├── branding/               # GET/POST authenticated branding
 │   │   └── public/             # GET — unauthenticated branding for the login page
+│   ├── audit-logs/             # GET — paginated, filtered audit log (ADMIN+, company-scoped)
 │   └── cron/                   # GET — manual trigger for all engines
 components/
 ├── NotificationBell.tsx        # Bell icon, unread badge, dropdown, mark-as-read
@@ -555,7 +640,8 @@ components/
 ├── Sidebar.tsx                 # App-wide navigation
 └── ui/                         # shadcn component library
 lib/
-├── auth.server.ts              # JWT verification + role guards (requireAuth, requireRole)
+├── audit-log.ts                # logAudit() — fire-and-forget audit helper; wired into DMS and Admin routes
+├── auth.server.ts              # JWT verification + role guards (requireAuth, requireRole, ADMIN_ONLY, APPROVER_PLUS, SUBMIT_ROLES)
 ├── cron.ts                     # node-cron scheduler (daily at 01:00)
 ├── dms-company-root.ts         # ensureCompanyRootFolder() — DB check → SP GET → SP POST → DB insert
 ├── dms-folder-path.ts          # buildFolderPath() — single source of truth for all DMS paths
@@ -567,6 +653,7 @@ lib/
 ├── module-access.ts            # hasModuleAccess / requireModuleAccess / gateModule — multi-tenant feature gating
 ├── notification.ts             # DB + email notification helper (with deep link support)
 ├── overdue.ts                  # Bulk overdue status updater
+├── permission.ts               # checkRole / checkCompanyAccess / checkExists — throw-on-fail security helpers
 ├── prisma.ts                   # Prisma client singleton
 ├── reminder.ts                 # Due-date reminder engine
 ├── seed.ts                     # Database seed (idempotent upserts)
@@ -610,6 +697,7 @@ instrumentation.ts              # Next.js startup hook — runs seed + startCron
 | `CompanyModule` | Per-tenant enable/disable flag — `(company_id, module_id) → enabled: boolean` |
 | `Document` | Unified file metadata for Compliance and AMC uploads — `module: ModuleType`, `record_id`, `file_path` |
 | `Branding` | Per-tenant branding — `app_name`, `browser_title`, `logo_base64`, `login_banner`, `login_footer`, `login_bg`, `primary_color`, `secondary_color`, `theme_mode` (all images base64, no SharePoint) |
+| `AuditLog` | Lightweight, relation-free event log — `action`, `module`, `entity_type`, `entity_id`, `description`, `company_id`, `user_id`, `created_at`; no FK relations, no cascade side-effects |
 
 ---
 
@@ -724,9 +812,14 @@ Starts Next.js with Turbopack on port **5000**. Hot module replacement is enable
 - Auth cookies are **HttpOnly** — inaccessible to JavaScript, preventing XSS token theft
 - All protected API routes independently verify the JWT — no reliance on middleware alone
 - All database queries are scoped to the authenticated user's `company_id` (multi-tenant data isolation)
+- Cross-tenant access prevention: `GET /api/compliance/[id]` and `GET /api/amc/[id]` use `findFirst({ where: { id, company_id } })` — a record that doesn't belong to the caller's tenant returns 404, not 403, to avoid leaking existence
+- `lib/permission.ts` provides three composable security helpers (`checkRole`, `checkCompanyAccess`, `checkExists`) that throw on denial; every denial also fires `console.warn("[security] ...")` with the user ID and attempted resource
+- Legacy `POST /api/compliance/submit` now requires `requireRole(SUBMIT_ROLES)` (it previously had no auth check at all) and validates `company_id` before updating
+- Legacy `POST /api/compliance/approve` and `POST /api/compliance/reject` now verify the fetched record's `company_id` matches the caller before making any state change
 - Approve and reject API routes enforce role checks server-side and return `403` for unauthorised callers
 - Company delete is blocked server-side when linked records exist — no orphaned data
 - Remarks validation for reject is enforced at both client and API level
 - SMTP passwords are encrypted with **AES-256-CBC** before storage — the raw password is never persisted
 - Sensitive fields such as `password_hash` and decrypted SMTP credentials are never returned in any API response
 - Notification records are always scoped to the authenticated user's `user_id` — users can never read each other's notifications
+- All significant DMS and admin actions are written to the `AuditLog` table via a fire-and-forget helper that never blocks or throws, giving a tamper-evident trail for each tenant

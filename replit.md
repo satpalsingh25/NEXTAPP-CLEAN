@@ -335,6 +335,44 @@ Compliance and AMC uploads **never** create DMS folder entries or check DMS perm
 
 ---
 
+## Audit Log System
+
+Lightweight, relation-free event log. Schema: `action`, `module`, `entity_type`, `entity_id`, `description`, `company_id`, `user_id`, `created_at`. No `@relation` fields — no cascade deletes, no FK drift.
+
+- **`lib/audit-log.ts`** — `logAudit()` helper: fire-and-forget (try/catch → console.error only), never throws. Uses named import `import { prisma } from "@/lib/prisma"`.
+- **14 action points wired**: DMS (create/rename/delete folder; upload/download/delete/rename file; update folder permissions) and Admin (UPDATE_BRANDING, USER_CREATE, USER_UPDATE).
+- **`GET /api/audit-logs`** — ADMIN+, company-scoped, paginated (default 50/page), filters: `module`, `action`, `user_id`, `from`, `to`. Batch user-name enrichment in one extra query (no N+1).
+- **`/admin/audit-logs`** — filter bar, colored action badges (green=safe, amber=mutation, red=delete, blue=workflow), paginated table.
+- **Sidebar**: listed under `SYSTEM` group (alongside future system-level entries).
+
+---
+
+## API Security Layer (`lib/permission.ts`)
+
+Three composable, throw-on-fail helpers for use inside route `try/catch` blocks:
+
+| Helper | Throws when |
+|---|---|
+| `checkRole(user, roles[])` | User's role is not in the allowed list |
+| `checkCompanyAccess(user, resourceCompanyId)` | Resource's `company_id` ≠ caller's `company_id` (SUPER_ADMIN exempt) |
+| `checkExists(resource)` | Resource is `null` / `undefined` |
+
+Every denial fires `console.warn("[security] ...")` with the user ID and attempted resource.
+
+### Security fixes applied
+
+| Route | Previous gap | Fix |
+|---|---|---|
+| `GET /api/compliance/[id]` | `findUnique({ where: { id } })` — cross-tenant read | `findFirst({ where: { id, company_id } })` |
+| `GET /api/amc/[id]` | Same | Same |
+| `POST /api/compliance/submit` (legacy) | **No `requireAuth` at all** | Added `requireRole(SUBMIT_ROLES)` + company_id check |
+| `POST /api/compliance/approve` (legacy) | Fetched record by ID, no company check | Added `checkCompanyAccess` after fetch |
+| `POST /api/compliance/reject` (legacy) | Didn't even fetch the record — updated by ID directly | Now fetches first, checks company, then updates |
+
+Newer `compliance/[id]/submit`, `compliance/[id]/approve`, `amc/[id]/submit`, `amc/[id]/approve` were already correctly secured.
+
+---
+
 ## Module Access Control
 
 Per-tenant feature gating. A `Module` master table lists toggleable features (`COMPLIANCE`, `AMC`, `DMS`); a `CompanyModule` row enables/disables each module for each company. **Default is allow** — absence of a `CompanyModule` row means the module is enabled.
@@ -425,3 +463,6 @@ Users / Companies* / Roles / Groups / Functions / Departments / Countries
 - **Branding logo storage**: Base64 in the DB — `lib/storage.ts` (SharePoint) is **not** used for branding. Branding works offline and without the DMS module.
 - **Public branding endpoint** returns the **first** `Branding` row (oldest by `created_at`) since the unauthenticated login page can't know which company is signing in. For multi-tenant login differentiation (e.g. by subdomain), this resolution layer would need to be added.
 - **Legacy duplication**: `Company` still has `logo_url` / `primary_color` / `secondary_color` columns from before the `Branding` table existed. They're unused by the new branding flow but not yet dropped.
+- **`audit-log.ts` import**: Must use named import `import { prisma } from "@/lib/prisma"` — not the default export. Using the default export silently causes the helper to fail at runtime.
+- **`lib/permission.ts` pattern**: Helpers throw on denial so they can be used inside `try/catch` blocks that return a uniform 403 response. SUPER_ADMIN is exempt from `checkCompanyAccess` (can see all tenants).
+- **Legacy Compliance routes**: `POST /api/compliance/submit`, `/approve`, `/reject` are legacy routes (body carries the `id`). The canonical routes are `POST /api/compliance/[id]/submit` etc. Both sets are now fully auth-guarded.
