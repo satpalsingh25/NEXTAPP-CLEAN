@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { gateModule } from "@/lib/module-access";
+import { checkCompanyAccess } from "@/lib/permission";
 
 export async function GET(
   req: NextRequest,
@@ -12,11 +13,12 @@ export async function GET(
   const gate = await gateModule(req, "AMC");
   if (gate) return gate;
 
+  const { company_id } = auth.user;
   const { id } = await params;
 
   try {
-    const record = await prisma.aMC.findUnique({
-      where: { id },
+    const record = await prisma.aMC.findFirst({
+      where: { id, company_id },
       include: {
         amcTemplate: { select: { id: true, name: true, approval_levels: true, frequency: true } },
         asset: { select: { id: true, name: true } },

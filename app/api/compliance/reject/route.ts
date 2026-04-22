@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, APPROVER_PLUS } from "@/lib/auth.server";
+import { checkCompanyAccess } from "@/lib/permission";
 import { gateModule } from "@/lib/module-access";
 
 export async function POST(req: NextRequest) {
@@ -20,6 +21,16 @@ export async function POST(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const record = await prisma.compliance.findUnique({ where: { id } });
+    if (!record) {
+      return NextResponse.json({ error: "Compliance not found" }, { status: 404 });
+    }
+    try {
+      checkCompanyAccess(auth.user, record.company_id);
+    } catch {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const rejectedStatus = await prisma.statusMaster.findFirst({

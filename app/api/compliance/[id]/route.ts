@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { gateModule } from "@/lib/module-access";
+import { checkCompanyAccess } from "@/lib/permission";
 
 export async function GET(
   req: NextRequest,
@@ -12,17 +13,19 @@ export async function GET(
   const gate = await gateModule(req, "COMPLIANCE");
   if (gate) return gate;
 
+  const { company_id } = auth.user;
   const { id } = await params;
 
   try {
-    const record = await prisma.compliance.findUnique({
-      where: { id },
+    const record = await prisma.compliance.findFirst({
+      where: { id, company_id },
       include: {
         template: { select: { id: true, title: true, approval_levels: true, frequency: true } },
       },
     });
 
     if (!record) {
+      console.warn("[security] compliance record not found or cross-tenant attempt:", auth.user.user_id, id);
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

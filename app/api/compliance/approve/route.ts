@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, APPROVER_PLUS } from "@/lib/auth.server";
+import { checkCompanyAccess } from "@/lib/permission";
 import { gateModule } from "@/lib/module-access";
 
 const MAX_LEVEL = 3;
@@ -28,6 +29,12 @@ export async function POST(req: NextRequest) {
 
     if (!compliance) {
       return NextResponse.json({ error: "Compliance not found" }, { status: 404 });
+    }
+
+    try {
+      checkCompanyAccess(auth.user, compliance.company_id);
+    } catch {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const currentLevel = compliance.current_approval_level;
