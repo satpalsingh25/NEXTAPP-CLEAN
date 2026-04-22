@@ -26,6 +26,7 @@ import {
   Cloud,
   HardDrive,
   FolderOpen,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
@@ -106,8 +107,11 @@ const ALL_MODULES: NavModule[] = [
       { name: "DMS Settings",         href: "/admin/dms-settings", icon: HardDrive,                    group: "Company Settings" },
 
       /* ── Mail Settings group ── */
-      { name: "SMTP Settings",        href: "/admin/smtp",            icon: Mail,     group: "Mail Settings" },
-      { name: "Template Settings",    href: "/admin/email-templates", icon: FileCode, group: "Mail Settings" },
+      { name: "SMTP Settings",        href: "/admin/smtp",            icon: Mail,       group: "Mail Settings" },
+      { name: "Template Settings",    href: "/admin/email-templates", icon: FileCode,   group: "Mail Settings" },
+
+      /* ── System group ── */
+      { name: "Audit Logs",           href: "/admin/audit-logs",      icon: ScrollText, group: "System" },
     ],
   },
 ];
