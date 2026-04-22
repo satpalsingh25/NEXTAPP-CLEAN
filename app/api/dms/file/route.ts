@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { gateModule } from "@/lib/module-access";
+import { logAudit } from "@/lib/audit-log";
 
 /* ------------------------------------------------------------------ */
 /* GET /api/dms/file?file_id=<uuid>[&download=true]                    */
@@ -91,6 +92,9 @@ export async function GET(req: NextRequest) {
     : `inline; filename="${filename}"`;
 
   /* 5. Stream the file body back to the client --------------------- */
+  if (download) {
+    void logAudit({ company_id, user_id: auth.user.user_id, action: "DOWNLOAD_FILE", module: "DMS", entity_type: "file", entity_id: doc.id, description: `Downloaded ${doc.name}` });
+  }
   return new NextResponse(spRes.body, {
     status: 200,
     headers: {
@@ -195,6 +199,8 @@ export async function DELETE(req: NextRequest) {
 
   /* 4. Delete DB record --------------------------------------------- */
   await prisma.dmsDocument.delete({ where: { id: file_id } });
+
+  void logAudit({ company_id, user_id: auth.user.user_id, action: "DELETE_FILE", module: "DMS", entity_type: "file", entity_id: file_id, description: `Deleted file ${doc.name}` });
 
   /* 5. Return success ----------------------------------------------- */
   return NextResponse.json({ success: true });

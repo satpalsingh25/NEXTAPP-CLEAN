@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
+import { logAudit } from "@/lib/audit-log";
 
 const USER_SELECT = {
   id: true,
@@ -80,6 +81,8 @@ export async function POST(req: NextRequest) {
       },
       select: USER_SELECT,
     });
+
+    void logAudit({ company_id, user_id: auth.user.user_id, action: "USER_CREATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Created user ${user.name || user.email}` });
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

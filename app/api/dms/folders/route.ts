@@ -6,6 +6,7 @@ import { ensureCompanyRootFolder } from "@/lib/dms-company-root";
 import { buildFolderPath } from "@/lib/dms-folder-path";
 import { logDmsActivity } from "@/lib/dms-activity";
 import { gateModule } from "@/lib/module-access";
+import { logAudit } from "@/lib/audit-log";
 
 /* Build breadcrumb trail by walking up the parent chain */
 async function buildBreadcrumbs(
@@ -167,6 +168,7 @@ export async function POST(req: NextRequest) {
       entity_id:   folder.id,
       entity_name: folder.name,
     });
+    void logAudit({ company_id, user_id, action: "CREATE_FOLDER", module: "DMS", entity_type: "folder", entity_id: folder.id, description: `Created folder ${folder.name}` });
 
     return NextResponse.json(folder, { status: 201 });
   }
@@ -248,6 +250,7 @@ export async function POST(req: NextRequest) {
     entity_id:   folder.id,
     entity_name: folder.name,
   });
+  void logAudit({ company_id, user_id, action: "CREATE_FOLDER", module: "DMS", entity_type: "folder", entity_id: folder.id, description: `Created folder ${folder.name}` });
 
   return NextResponse.json(folder, { status: 201 });
 }

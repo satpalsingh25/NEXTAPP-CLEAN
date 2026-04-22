@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth.server";
+import { logAudit } from "@/lib/audit-log";
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -121,6 +122,8 @@ export async function POST(req: NextRequest) {
     update: patch,
     create: { company_id, ...patch },
   });
+
+  void logAudit({ company_id, user_id: auth.user.user_id, action: "UPDATE_BRANDING", module: "ADMIN", entity_type: "branding", description: "Updated branding settings" });
 
   return NextResponse.json({ success: true, branding });
 }

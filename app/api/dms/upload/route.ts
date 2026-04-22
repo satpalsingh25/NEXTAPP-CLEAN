@@ -6,6 +6,7 @@ import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { logDmsActivity } from "@/lib/dms-activity";
 import { gateModule } from "@/lib/module-access";
+import { logAudit } from "@/lib/audit-log";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/upload                                                 */
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
       entity_id:   doc.id,
       entity_name: doc.name,
     });
+    void logAudit({ company_id, user_id, action: "UPLOAD_FILE", module: "DMS", entity_type: "file", entity_id: doc.id, description: `Uploaded file ${doc.name}` });
 
     uploaded.push({
       id:          doc.id,

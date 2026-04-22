@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth.server";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { logDmsActivity } from "@/lib/dms-activity";
 import { gateModule } from "@/lib/module-access";
+import { logAudit } from "@/lib/audit-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,6 +41,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     where: { id },
     data:  { name },
   });
+
+  void logAudit({ company_id, user_id: auth.user.user_id, action: "RENAME", module: "DMS", entity_type: "folder", entity_id: id, description: `Renamed to ${name}` });
 
   return NextResponse.json(updated);
 }
@@ -91,6 +94,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     entity_id:   id,
     entity_name: folder.name,
   });
+  void logAudit({ company_id, user_id: auth.user.user_id, action: "DELETE_FOLDER", module: "DMS", entity_type: "folder", entity_id: id, description: `Deleted folder ${folder.name}` });
 
   return NextResponse.json({ success: true });
 }

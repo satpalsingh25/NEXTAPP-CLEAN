@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
+import { logAudit } from "@/lib/audit-log";
 
 const USER_SELECT = {
   id: true,
@@ -26,23 +27,7 @@ export async function GET(
     const { id } = await params;
     const user = await prisma.user.findUnique({
       where: { id },
-      select: {
-        ...USER_SELECT,
-        audit_logs: {
-          orderBy: { timestamp: "desc" },
-          take: 50,
-          select: {
-            id: true,
-            action_type: true,
-            module: true,
-            record_id: true,
-            old_value: true,
-            new_value: true,
-            ip_address: true,
-            timestamp: true,
-          },
-        },
-      },
+      select: USER_SELECT,
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
     return NextResponse.json(user);
@@ -75,6 +60,8 @@ export async function PUT(
       },
       select: USER_SELECT,
     });
+
+    void logAudit({ company_id: auth.user.company_id, user_id: auth.user.user_id, action: "USER_UPDATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Updated user ${user.name || user.email}` });
 
     return NextResponse.json(user);
   } catch (error) {

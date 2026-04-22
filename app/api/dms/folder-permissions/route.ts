@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth.server";
 import { gateModule } from "@/lib/module-access";
+import { logAudit } from "@/lib/audit-log";
 
 const VALID_ACCESS_TYPES = ["USER", "GROUP", "DEPARTMENT", "FUNCTION", "COMPANY"] as const;
 type AccessType = (typeof VALID_ACCESS_TYPES)[number];
@@ -119,6 +120,8 @@ export async function POST(req: NextRequest) {
     await prisma.folderPermission.create({ data: { folder_id, access_type, access_id, ...permissions } });
   }
 
+  void logAudit({ company_id, user_id: auth.user.user_id, action: "PERMISSION_UPDATE", module: "DMS", entity_type: "folder", entity_id: folder_id, description: `Updated permissions` });
+
   return NextResponse.json({ success: true });
 }
 
@@ -139,5 +142,6 @@ export async function DELETE(req: NextRequest) {
   if (!record) return NextResponse.json({ error: "Permission record not found." }, { status: 404 });
 
   await prisma.folderPermission.delete({ where: { id } });
+  void logAudit({ company_id: auth.user.company_id, user_id: auth.user.user_id, action: "PERMISSION_UPDATE", module: "DMS", entity_type: "folder", entity_id: record.folder_id, description: `Removed permission` });
   return NextResponse.json({ success: true });
 }
