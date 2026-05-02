@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth.server";
-import { logAudit } from "@/lib/audit-log";
+import { logAudit }                from "@/lib/audit-log";
+import { checkRateLimit }          from "@/lib/rate-limit";
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -36,6 +37,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["SUPER_ADMIN", "ADMIN"]);
   if ("error" in auth) return auth.error;
+
+  /* Rate limit — branding updates are infrequent; 10 / 15 min */
+  const rl = checkRateLimit(auth.user.user_id, "branding-update", "write");
+  if (rl) return rl;
 
   const company_id = auth.user.company_id;
   if (!company_id) {

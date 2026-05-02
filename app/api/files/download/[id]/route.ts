@@ -3,6 +3,8 @@ import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { logAudit }                from "@/lib/audit-log";
+import { checkRateLimit }          from "@/lib/rate-limit";
+import { validateUUID, ValidationError } from "@/lib/validation";
 import path                        from "path";
 
 /* ------------------------------------------------------------------ */
@@ -50,7 +52,19 @@ export async function GET(
   if ("error" in auth) return auth.error;
   const { company_id, user_id } = auth.user;
 
+  /* Rate limit — 100 downloads / 15 min per user */
+  const rlCheck = checkRateLimit(user_id, "files-download", "files");
+  if (rlCheck) return rlCheck;
+
   const { id } = await params;
+
+  /* 1b. Validate id format ------------------------------------------ */
+  try {
+    validateUUID(id, "file id");
+  } catch (e) {
+    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 
   /* 2. Fetch Document record + cross-tenant guard ------------------- */
   const doc = await prisma.document.findUnique({ where: { id } });

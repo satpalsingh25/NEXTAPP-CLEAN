@@ -7,6 +7,8 @@ import { buildFolderPath } from "@/lib/dms-folder-path";
 import { logDmsActivity } from "@/lib/dms-activity";
 import { gateModule } from "@/lib/module-access";
 import { logAudit } from "@/lib/audit-log";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { validateRequiredString, validateUUID, ValidationError } from "@/lib/validation";
 
 /* Build breadcrumb trail by walking up the parent chain */
 async function buildBreadcrumbs(
@@ -101,7 +103,24 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const { name, parent_id, type } = body ?? {};
 
-  if (!name?.trim()) return NextResponse.json({ error: "name is required." }, { status: 400 });
+  /* Validate name length + content */
+  let folderName: string;
+  try {
+    folderName = validateRequiredString(name, 255, "Folder name");
+  } catch (e) {
+    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
+  /* Validate parent_id UUID if provided */
+  if (parent_id !== undefined && parent_id !== null && parent_id !== "") {
+    try {
+      validateUUID(parent_id, "parent_id");
+    } catch (e) {
+      if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+  }
 
   /* ── TEAM folder — admin only ─────────────────────────────────────────── */
   if (type === "TEAM") {
@@ -111,6 +130,10 @@ export async function POST(req: NextRequest) {
     if (gate) return gate;
     const { company_id, user_id } = auth.user;
 
+    /* Rate limit — 30 folder creates / 15 min */
+    const rl = checkRateLimit(user_id, "dms-folders-create", "write");
+    if (rl) return rl;
+
     const company = await prisma.company.findUnique({
       where:  { id: company_id },
       select: { name: true, company_folder_name: true },
@@ -119,7 +142,7 @@ export async function POST(req: NextRequest) {
 
     const companyFolder =
       company.company_folder_name?.trim() || company.name.replace(/\s+/g, "_");
-    const path = buildFolderPath({ type: "TEAM", companyFolderName: companyFolder, folderName: name.trim() });
+    const path = buildFolderPath({ type: "TEAM", companyFolderName: companyFolder, folderName });
 
     /* ── Ensure company root folder exists before creating subfolder ── */
     await ensureCompanyRootFolder(company_id, companyFolder, user_id);
@@ -132,7 +155,7 @@ export async function POST(req: NextRequest) {
     const folder = await prisma.dmsFolder.create({
       data: {
         company_id,
-        name:       name.trim(),
+        name:       folderName,
         path,
         type:       "TEAM",
         parent_id:  null,
@@ -180,6 +203,10 @@ export async function POST(req: NextRequest) {
   if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
+  /* Rate limit — 30 folder creates / 15 min */
+  const rl = checkRateLimit(user_id, "dms-folders-create", "write");
+  if (rl) return rl;
+
   /* ── Resolve parent path ────────────────────────────────────────────── */
   let parentPath: string;
 
@@ -211,7 +238,6 @@ export async function POST(req: NextRequest) {
 
   /* Full path via buildFolderPath: strips trailing slashes on parentPath,
      appends the folder name with no slug/lowercase conversion.            */
-  const folderName = name.trim();
   const folderPath = buildFolderPath({ parentPath, folderName });
 
   /* Duplicate check */

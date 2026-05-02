@@ -1,8 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { prisma }          from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import bcrypt              from "bcryptjs";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
-import { logAudit } from "@/lib/audit-log";
+import { logAudit }        from "@/lib/audit-log";
+import { checkRateLimit }  from "@/lib/rate-limit";
+import { validateEmail, validateRequiredString, validateOptionalString, ValidationError } from "@/lib/validation";
 
 const USER_SELECT = {
   id: true,
@@ -12,10 +14,10 @@ const USER_SELECT = {
   is_active: true,
   must_reset_password: true,
   created_at: true,
-  company: { select: { id: true, name: true } },
-  department: { select: { id: true, name: true } },
+  company:          { select: { id: true, name: true } },
+  department:       { select: { id: true, name: true } },
   businessFunction: { select: { id: true, name: true } },
-  group: { select: { id: true, name: true } },
+  group:            { select: { id: true, name: true } },
 };
 
 export async function GET(req: NextRequest) {
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     const users = await prisma.user.findMany({
       where,
-      select: USER_SELECT,
+      select:  USER_SELECT,
       orderBy: { created_at: "desc" },
     });
     return NextResponse.json(users);
@@ -44,17 +46,37 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ADMIN_ONLY);
   if ("error" in auth) return auth.error;
-  const { company_id: authCompanyId, role } = auth.user;
-  try {
-    const body = await req.json();
+  const { company_id: authCompanyId, role, user_id: actorId } = auth.user;
 
-    if (!body.email || !body.password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  /* Rate limit — 30 user-creates / 15 min */
+  const rl = checkRateLimit(actorId, "admin-users-create", "write");
+  if (rl) return rl;
+
+  try {
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+
+    /* Validate required fields */
+    let email: string;
+    let password: string;
+    try {
+      email    = validateEmail(body.email);
+      password = validateRequiredString(body.password, 128, "Password");
+      if (body.name !== undefined && body.name !== null && body.name !== "") {
+        validateOptionalString(body.name, 255, "Name");
+      }
+    } catch (e) {
+      if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
     }
 
     let company_id: string;
     if (role === "SUPER_ADMIN") {
-      company_id = body.company_id;
+      company_id = body.company_id as string;
       if (!company_id) {
         const fallback = await prisma.company.findFirst();
         if (!fallback) return NextResponse.json({ error: "No company found" }, { status: 500 });
@@ -64,25 +86,25 @@ export async function POST(req: NextRequest) {
       company_id = authCompanyId;
     }
 
-    const hashedPassword = await bcrypt.hash(body.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        email: body.email,
-        name: body.name || null,
-        password_hash: hashedPassword,
-        role: body.role || "USER",
+        email,
+        name:                body.name as string || null,
+        password_hash:       hashedPassword,
+        role:                (body.role as string) || "USER",
         company_id,
-        is_active: true,
-        must_reset_password: body.must_reset_password ?? false,
-        department_id: body.department_id || null,
-        function_id: body.function_id || null,
-        group_id: body.group_id || null,
+        is_active:           true,
+        must_reset_password: (body.must_reset_password as boolean) ?? false,
+        department_id:       (body.department_id as string) || null,
+        function_id:         (body.function_id as string) || null,
+        group_id:            (body.group_id as string) || null,
       },
       select: USER_SELECT,
     });
 
-    void logAudit({ company_id, user_id: auth.user.user_id, action: "USER_CREATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Created user ${user.name || user.email}` });
+    void logAudit({ company_id, user_id: actorId, action: "USER_CREATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Created user ${user.name || user.email}` });
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

@@ -1,0 +1,162 @@
+Implement lightweight enterprise-grade API rate limiting + input validation.
+
+----------------------------------------
+STEP 1 — CREATE VALIDATION HELPERS
+----------------------------------------
+
+Create:
+
+/lib/validation.ts
+
+----------------------------------------
+FUNCTIONS
+----------------------------------------
+
+✔ validateUUID(id)
+✔ validateRequiredString(value, maxLength)
+✔ validateEmail(email)
+✔ validateDate(date)
+✔ sanitizeText(text)
+
+----------------------------------------
+RULES
+----------------------------------------
+
+✔ Throw safe errors
+✔ Prevent empty/oversized inputs
+✔ Trim values
+✔ Basic XSS prevention
+
+----------------------------------------
+STEP 2 — CREATE RATE LIMIT HELPER
+----------------------------------------
+
+Create:
+
+/lib/rate-limit.ts
+
+----------------------------------------
+SIMPLE LOGIC
+----------------------------------------
+
+Per user_id + route:
+
+Example:
+
+100 requests / 15 min
+
+----------------------------------------
+STORAGE
+----------------------------------------
+
+Initial:
+✔ In-memory Map acceptable
+
+Future:
+✔ Redis
+
+----------------------------------------
+FUNCTION
+----------------------------------------
+
+checkRateLimit(userId, route)
+
+----------------------------------------
+ON LIMIT EXCEEDED
+----------------------------------------
+
+Return:
+429 Too Many Requests
+
+----------------------------------------
+STEP 3 — APPLY TO CRITICAL ROUTES
+----------------------------------------
+
+Apply to:
+
+✔ Login
+✔ File upload
+✔ File download
+✔ Folder create
+✔ User create/update
+✔ Branding update
+✔ Compliance submit
+✔ AMC submission
+
+----------------------------------------
+STEP 4 — VALIDATE ALL INPUTS
+----------------------------------------
+
+Before DB/API:
+
+✔ IDs
+✔ Names
+✔ Emails
+✔ Dates
+✔ Search params
+✔ Pagination values
+
+----------------------------------------
+EXAMPLES
+----------------------------------------
+
+folderId → validateUUID
+name → validateRequiredString(name, 255)
+
+----------------------------------------
+STEP 5 — FILE UPLOAD LIMITS
+----------------------------------------
+
+✔ Max file size
+✔ Allowed extensions
+✔ Safe filenames
+✔ Reject invalid MIME
+
+----------------------------------------
+STEP 6 — SAFE PAGINATION
+----------------------------------------
+
+✔ limit max 100
+✔ page min 1
+
+----------------------------------------
+STEP 7 — SAFE ERROR FORMAT
+----------------------------------------
+
+Standard:
+
+{
+  error: "Invalid input"
+}
+
+----------------------------------------
+STEP 8 — AUDIT OPTIONAL
+----------------------------------------
+
+Log excessive abuse attempts if useful
+
+----------------------------------------
+STEP 9 — PERFORMANCE
+----------------------------------------
+
+✔ Lightweight
+✔ Minimal DB overhead
+✔ No heavy middleware
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ Captcha
+❌ WAF
+❌ Redis dependency yet
+❌ Complex throttling
+
+----------------------------------------
+KEEP IT PRACTICAL
+----------------------------------------
+
+✔ Secure
+✔ Fast
+✔ Replit-friendly
+✔ Scalable later

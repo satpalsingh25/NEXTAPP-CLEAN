@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth.server";
-import { validateUpload } from "@/lib/dms-validation";
+import { prisma }             from "@/lib/prisma";
+import { requireAuth }        from "@/lib/auth.server";
+import { validateUpload }     from "@/lib/dms-validation";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
-import { checkFolderAccess } from "@/lib/dms-permission";
-import { logDmsActivity } from "@/lib/dms-activity";
-import { gateModule } from "@/lib/module-access";
-import { logAudit } from "@/lib/audit-log";
+import { checkFolderAccess }  from "@/lib/dms-permission";
+import { logDmsActivity }     from "@/lib/dms-activity";
+import { gateModule }         from "@/lib/module-access";
+import { logAudit }           from "@/lib/audit-log";
+import { checkRateLimit }     from "@/lib/rate-limit";
+import { validateUUID, validateFileName, validateFileExtension, ValidationError } from "@/lib/validation";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/upload                                                 */
@@ -20,6 +22,10 @@ export async function POST(req: NextRequest) {
   if (gate) return gate;
   const { company_id, user_id } = auth.user;
 
+  /* Rate limit — upload is expensive; 20 / 15 min */
+  const rl = checkRateLimit(user_id, "dms-upload", "upload");
+  if (rl) return rl;
+
   /* 1. Parse multipart body ---------------------------------------- */
   let form: FormData;
   try {
@@ -29,8 +35,13 @@ export async function POST(req: NextRequest) {
   }
 
   const folder_id = (form.get("folder_id") ?? "") as string;
-  if (!folder_id) {
-    return NextResponse.json({ error: "folder_id is required." }, { status: 400 });
+
+  /* 2. Validate inputs --------------------------------------------- */
+  try {
+    validateUUID(folder_id, "folder_id");
+  } catch (e) {
+    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
   }
 
   const rawFiles = form.getAll("file") as File[];
@@ -38,7 +49,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "At least one file is required." }, { status: 400 });
   }
 
-  /* 2. Validate against DmsSettings --------------------------------- */
+  /* Validate each file name + extension before touching SharePoint */
+  for (const file of rawFiles) {
+    try {
+      validateFileName(file.name);
+      validateFileExtension(file.name);
+    } catch (e) {
+      if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+  }
+
+  /* 3. Validate against DmsSettings (max size, max file count) ------ */
   try {
     await validateUpload(
       rawFiles.map((f) => ({ name: f.name, size: f.size })),
@@ -51,7 +73,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* 3. Fetch folder ------------------------------------------------- */
+  /* 4. Fetch folder ------------------------------------------------- */
   const folder = await prisma.dmsFolder.findUnique({ where: { id: folder_id } });
   if (!folder) {
     return NextResponse.json({ error: "Folder not found." }, { status: 404 });
@@ -61,8 +83,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }
 
-  /* 3a. Permission check — require can_upload ----------------------- */
-  /* USER folders: owner always has full access — no perm table query */
+  /* 4a. Permission check — require can_upload ----------------------- */
   const isOwnerUserFolder =
     folder.type === "USER" && folder.created_by === user_id;
 
@@ -76,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  /* 4. Resolve drive ID + access token (parallel) ------------------- */
+  /* 5. Resolve drive ID + access token (parallel) ------------------- */
   let drive_id:    string;
   let accessToken: string;
   try {
@@ -91,7 +112,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* 5. Upload each file to SharePoint & save metadata --------------- */
+  /* 6. Upload each file to SharePoint & save metadata --------------- */
   const uploaded: {
     id:          string;
     name:        string;
@@ -100,7 +121,7 @@ export async function POST(req: NextRequest) {
     uploaded_by: string;
   }[] = [];
 
-  const folderPath = folder.path.replace(/^\/+|\/+$/g, ""); // trim slashes
+  const folderPath = folder.path.replace(/^\/+|\/+$/g, "");
 
   for (const file of rawFiles) {
     const filename  = file.name;
@@ -134,11 +155,11 @@ export async function POST(req: NextRequest) {
       }
 
       const spFile = await uploadRes.json() as {
-        id?:     string;   // DriveItem.id — stable identifier for the item
+        id?:     string;
         webUrl?: string;
       };
-      fileUrl           = spFile.webUrl ?? uploadUrl;
-      spItemId          = spFile.id ?? null;
+      fileUrl  = spFile.webUrl ?? uploadUrl;
+      spItemId = spFile.id ?? null;
 
     } catch (e: unknown) {
       return NextResponse.json(
@@ -147,7 +168,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /* Save metadata to DmsDocument ---------------------------------- */
     const doc = await prisma.dmsDocument.create({
       data: {
         company_id,
@@ -178,6 +198,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  /* 6. Return uploaded file list ------------------------------------ */
   return NextResponse.json({ success: true, uploaded });
 }

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma }          from "@/lib/prisma";
 import { requireRole, SUBMIT_ROLES } from "@/lib/auth.server";
-import { gateModule } from "@/lib/module-access";
+import { gateModule }      from "@/lib/module-access";
+import { checkRateLimit }  from "@/lib/rate-limit";
+import { sanitizeText }    from "@/lib/validation";
 
 export async function POST(
   req: NextRequest,
@@ -13,14 +15,18 @@ export async function POST(
   if (gate) return gate;
   const { user_id, company_id } = auth.user;
 
+  /* Rate limit — 20 submissions / 15 min */
+  const rl = checkRateLimit(user_id, "compliance-submit", "submit");
+  if (rl) return rl;
+
   const { id } = await params;
 
   let remarks = "";
   let file_url = "";
   try {
     const body = await req.json().catch(() => ({}));
-    remarks  = body.remarks  ?? "";
-    file_url = body.file_url ?? "";
+    remarks  = sanitizeText(String(body.remarks  ?? "")).slice(0, 2000);
+    file_url = String(body.file_url ?? "").trim().slice(0, 2048);
   } catch {}
 
   try {
