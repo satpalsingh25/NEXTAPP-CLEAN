@@ -65,25 +65,74 @@ The workflow `Start application` runs `npm run dev` on port **5000**.
 
 ## Local / Self-Hosted Deployment
 
-This app has **no Vercel dependency**.
+This app has **no Vercel dependency**. It runs on Node.js 18 or 20 LTS (20 LTS recommended).
+
+### Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Node.js | 18 LTS or 20 LTS (recommended) |
+| npm | 9+ (bundled with Node) |
+| PostgreSQL | 14+ |
+
+### Step-by-step
 
 ```bash
-# 1. Install dependencies
+# 1. Clone your repo
+git clone <your-repo-url>
+cd <repo-folder>
+
+# 2. Install all dependencies
 npm install
 
-# 2. Create .env.local
-DATABASE_URL=postgresql://postgres:secret@localhost:5432/dbname
-JWT_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+# 3. Generate the Prisma client  ← required before build or db push
+npx prisma generate
 
-# 3. Push schema to the database
+# 4. Create your environment file (copy the example)
+cp .env.example .env.local
+# Then edit .env.local and set DATABASE_URL and JWT_SECRET
+
+# 5. Push the schema to your PostgreSQL database (safe / idempotent)
 npx prisma db push
 
-# 4. Build and start
-npm run build && npm start     # production
-npm run dev                    # development (Turbopack, port 5000)
+# 6a. Development server  (hot-reload, port 5000)
+npm run dev
+
+# 6b. OR production build + start
+npm run build
+npm start
 ```
 
-A `Dockerfile` in the root can also be used for containerised deployment.
+The app will be available at **http://localhost:5000**.  
+The seed runs automatically on first start and creates `admin@local.com / Admin123`.
+
+### Environment File (`.env.local`)
+
+```env
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/compliance_db
+JWT_SECRET=<64-char hex — generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+NEXT_TELEMETRY_DISABLED=1
+```
+
+> **Important:** `.env.local` is gitignored. Never commit real secrets.
+
+### Docker (containerised)
+
+A `Dockerfile` is included in the root for containerised deployment:
+
+```bash
+docker build \
+  --build-arg DATABASE_URL="postgresql://..." \
+  --build-arg JWT_SECRET="..." \
+  -t compliance-app .
+
+docker run -p 5000:5000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e JWT_SECRET="..." \
+  compliance-app
+```
+
+The container automatically runs `prisma db push` then starts the server.
 
 ---
 
