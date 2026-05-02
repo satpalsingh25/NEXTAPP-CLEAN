@@ -95,6 +95,17 @@ export async function seed() {
     }
     console.log("[seed] AMC template already exists.");
 
+    // ── Modules (master list for feature gating) ──────────────────────────────
+    const moduleNames = ["AMC", "COMPLIANCE", "DMS"];
+    for (const name of moduleNames) {
+      await prisma.module.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      });
+    }
+    console.log("[seed] Modules seeded: AMC, COMPLIANCE, DMS.");
+
     console.log("[seed] Seed complete.");
   } catch (error) {
     console.error("[seed] Seed failed:", error);
