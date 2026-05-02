@@ -38,6 +38,12 @@ type LogEntry = {
   actor_email: string | null;
 };
 
+type DocumentRecord = {
+  id: string;
+  file_path: string;
+  uploaded_at: string;
+};
+
 type DetailData = {
   name: string;
   status: string;
@@ -48,6 +54,7 @@ type DetailData = {
   submitter_email: string | null;
   amcTemplate?: { name?: string; approval_levels?: number } | null;
   approval_logs: LogEntry[];
+  documents?: DocumentRecord[];
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -244,21 +251,49 @@ function DetailsModal({
               )}
 
               {/* 3 · Attachments */}
-              {fileUrl && (
+              {((data?.documents ?? []).length > 0 || fileUrl) && (
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Paperclip size={11} /> Attachments
                   </p>
-                  <div className="bg-white rounded-xl border border-slate-100 px-4 py-3 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-700 truncate">{fileUrl.split("/").pop() ?? "Attachment"}</span>
-                    <a
-                      href={fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors shrink-0"
-                    >
-                      <Download size={11} /> Download / View
-                    </a>
+                  <div className="space-y-2">
+                    {(data?.documents ?? []).map((doc) => {
+                      const filename = doc.file_path.split("/").pop() ?? "Attachment";
+                      return (
+                        <div key={doc.id} className="bg-white rounded-xl border border-slate-100 px-4 py-3 flex items-center justify-between gap-3">
+                          <span className="text-xs text-slate-700 truncate">{filename}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <a
+                              href={`/api/files/preview/${doc.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                            >
+                              <FileText size={11} /> Preview
+                            </a>
+                            <a
+                              href={`/api/files/download/${doc.id}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                              <Download size={11} /> Download
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {fileUrl && (
+                      <div className="bg-white rounded-xl border border-slate-100 px-4 py-3 flex items-center justify-between gap-3">
+                        <span className="text-xs text-slate-700 truncate">{fileUrl.split("/").pop() ?? "Attachment URL"}</span>
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors shrink-0"
+                        >
+                          <Download size={11} /> Open Link
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

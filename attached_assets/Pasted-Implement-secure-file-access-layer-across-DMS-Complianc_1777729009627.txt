@@ -1,0 +1,164 @@
+Implement secure file access layer across DMS, Compliance, AMC.
+
+----------------------------------------
+STEP 1 — CREATE SECURE DOWNLOAD API
+----------------------------------------
+
+Create:
+
+/app/api/files/download/[id]/route.ts
+
+----------------------------------------
+CODE REQUIREMENTS
+----------------------------------------
+
+✔ Require authentication
+✔ Validate file belongs to req.user.company_id
+✔ Validate file exists
+✔ Fetch file from SharePoint using internal path
+✔ Return file buffer
+✔ Force attachment download
+✔ Log audit event
+
+----------------------------------------
+RESPONSE HEADERS
+----------------------------------------
+
+Content-Type: file.mime_type
+Content-Disposition: attachment; filename="file.name"
+
+----------------------------------------
+STEP 2 — CREATE SECURE PREVIEW API
+----------------------------------------
+
+Create:
+
+/app/api/files/preview/[id]/route.ts
+
+----------------------------------------
+SAME LOGIC AS DOWNLOAD
+----------------------------------------
+
+✔ Same validation
+✔ Same SharePoint fetch
+✔ Inline preview instead of attachment
+
+----------------------------------------
+RESPONSE HEADERS
+----------------------------------------
+
+Content-Disposition: inline; filename="file.name"
+
+----------------------------------------
+STEP 3 — FRONTEND REFACTOR
+----------------------------------------
+
+Replace ALL existing direct SharePoint links:
+
+❌ file.sharepoint_url
+❌ raw file path
+
+WITH:
+
+✔ /api/files/download/{id}
+✔ /api/files/preview/{id}
+
+----------------------------------------
+STEP 4 — MODULE COVERAGE
+----------------------------------------
+
+Apply to:
+
+✔ DMS
+✔ Compliance evidence documents
+✔ AMC documents
+✔ Branding assets if applicable
+
+----------------------------------------
+STEP 5 — AUDIT LOGGING
+----------------------------------------
+
+On successful preview:
+
+action: "PREVIEW_FILE"
+
+On successful download:
+
+action: "DOWNLOAD_FILE"
+
+----------------------------------------
+STEP 6 — PERMISSION ENFORCEMENT
+----------------------------------------
+
+Before serving file:
+
+✔ requireAuth(req)
+✔ company_id match
+✔ optional folder permission validation
+
+----------------------------------------
+STEP 7 — SHAREPOINT STORAGE RULE
+----------------------------------------
+
+Database stores:
+
+✔ Internal SharePoint path
+✔ Metadata only
+
+Database should NOT expose:
+
+❌ Public URL
+❌ Temporary direct links
+
+----------------------------------------
+STEP 8 — PERFORMANCE
+----------------------------------------
+
+For now:
+
+✔ Buffer response acceptable
+
+Future:
+
+✔ Stream large files
+
+----------------------------------------
+STEP 9 — ERROR HANDLING
+----------------------------------------
+
+Unauthorized:
+403
+
+Not Found:
+404
+
+Generic:
+500 safe response only
+
+----------------------------------------
+STEP 10 — TESTING
+----------------------------------------
+
+✔ Logged-in valid user → success
+✔ Wrong company user → fail
+✔ Direct URL exposure → removed
+✔ Preview PDF/Image → works
+✔ Download Office docs → works
+
+----------------------------------------
+DO NOT ADD YET
+----------------------------------------
+
+❌ Signed URLs
+❌ Public share links
+❌ External guest access
+❌ CDN
+
+----------------------------------------
+KEEP IT CLEAN
+----------------------------------------
+
+✔ Secure
+✔ Controlled
+✔ Multi-tenant safe
+✔ Enterprise-ready

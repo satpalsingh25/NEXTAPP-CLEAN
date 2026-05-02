@@ -60,6 +60,12 @@ export async function GET(
     const submitter = record.submitted_by ? userMap[record.submitted_by] : null;
     const approver  = record.approved_by  ? userMap[record.approved_by]  : null;
 
+    const documents = await prisma.document.findMany({
+      where:   { company_id, module: "COMPLIANCE", record_id: id },
+      select:  { id: true, file_path: true, uploaded_at: true },
+      orderBy: { uploaded_at: "asc" },
+    });
+
     return NextResponse.json({
       ...record,
       submitter_name:  submitter?.name  ?? null,
@@ -67,6 +73,7 @@ export async function GET(
       approver_name:   approver?.name   ?? null,
       approver_email:  approver?.email  ?? null,
       approval_logs: enrichedLogs,
+      documents,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
