@@ -1,0 +1,559 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmailTemplateType {
+  REMINDER
+  APPROVAL
+  OVERDUE
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  CHECKER
+  APPROVER
+  USER
+  CEO
+}
+
+enum ModuleType {
+  COMPLIANCE
+  AMC
+  TICKET
+}
+
+enum Action {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model Company {
+  id                   String             @id @default(uuid()) @db.Uuid
+  name                 String
+  custom_display_name  String?
+  logo_url             String?
+  primary_color        String             @default("#2563eb")
+  secondary_color      String?
+  created_at           DateTime           @default(now())
+  users                User[]
+  vendors              Vendor[]
+  assets               Asset[]
+  status_masters       StatusMaster[]
+  approval_matrices    ApprovalMatrix[]
+  compliance_templates ComplianceTemplate[]
+  compliances          Compliance[]
+  amcs                 AMC[]
+  documents            Document[]
+  company_modules      CompanyModule[]
+  approval_logs        ApprovalLog[]
+  country_id           String?            @db.Uuid
+  country              Country?           @relation(fields: [country_id], references: [id])
+  departments          Department[]
+  business_functions   BusinessFunction[]
+  groups               Group[]
+  role_masters         RoleMaster[]
+  is_active            Boolean            @default(true)
+  smtp_configs         SmtpConfig[]
+  email_templates      EmailTemplate[]
+  company_folder_name  String?
+  branding             Branding?
+}
+
+model Branding {
+  id              String   @id @default(uuid()) @db.Uuid
+  company_id      String   @unique @db.Uuid
+
+  app_name        String?
+  browser_title   String?
+
+  logo_base64     String?  @db.Text
+
+  login_banner    String?  @db.Text
+  login_footer    String?  @db.Text
+  login_bg        String?  @db.Text
+
+  primary_color   String?
+  secondary_color String?
+
+  theme_mode      String   @default("light")
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  company         Company  @relation(fields: [company_id], references: [id])
+}
+
+model User {
+  id                  String            @id @default(uuid()) @db.Uuid
+  company_id          String            @db.Uuid
+  company             Company           @relation(fields: [company_id], references: [id])
+  email               String            @unique
+  name                String?
+  password_hash       String
+  role                Role
+  is_active           Boolean           @default(true)
+  must_reset_password Boolean           @default(false)
+  department_id       String?           @db.Uuid
+  department          Department?       @relation(fields: [department_id], references: [id])
+  function_id         String?           @db.Uuid
+  businessFunction    BusinessFunction? @relation(fields: [function_id], references: [id])
+  group_id            String?           @db.Uuid
+  group               Group?            @relation("GroupMembers", fields: [group_id], references: [id])
+  owned_groups           Group[]           @relation("GroupOwner")
+  created_at             DateTime          @default(now())
+  assigned_compliances   Compliance[]      @relation("ComplianceAssignedUser")
+  assigned_amcs          AMC[]             @relation("AMCAssignedUser")
+  amc_approval_levels    AMCApprovalLevel[]
+  notifications          Notification[]
+}
+
+model Vendor {
+  id         String   @id @default(uuid()) @db.Uuid
+  company_id String   @db.Uuid
+  company    Company  @relation(fields: [company_id], references: [id])
+  name       String
+  contact    String?
+  created_at DateTime @default(now())
+  amcs       AMC[]
+}
+
+model Asset {
+  id         String   @id @default(uuid()) @db.Uuid
+  company_id String   @db.Uuid
+  company    Company  @relation(fields: [company_id], references: [id])
+  name       String
+  serial_no  String?
+  location   String?
+  created_at DateTime @default(now())
+  amcs       AMC[]
+}
+
+model StatusMaster {
+  id          String       @id @default(uuid()) @db.Uuid
+  company_id  String       @db.Uuid
+  company     Company      @relation(fields: [company_id], references: [id])
+  module      ModuleType
+  name        String
+  is_final    Boolean      @default(false)
+  order_index Int          @default(0)
+  created_at  DateTime     @default(now())
+  compliances Compliance[] @relation("ComplianceStatus")
+  amcs        AMC[]        @relation("AMCStatus")
+}
+
+model ApprovalMatrix {
+  id           String   @id @default(uuid()) @db.Uuid
+  company_id   String   @db.Uuid
+  company      Company  @relation(fields: [company_id], references: [id])
+  module       ModuleType
+  level_number Int
+  role_required Role
+  created_at   DateTime @default(now())
+}
+
+model ComplianceTemplate {
+  id                String       @id @default(uuid()) @db.Uuid
+  company_id        String       @db.Uuid
+  company           Company      @relation(fields: [company_id], references: [id])
+  title             String
+  frequency         String
+  start_date        DateTime?
+  due_day           Int?
+  reminder_days     Int?
+  approval_levels   Int          @default(1)
+  compliances       Compliance[]
+  approval_matrices ComplianceApprovalMatrix[]
+}
+
+model ComplianceApprovalMatrix {
+  id          String             @id @default(uuid()) @db.Uuid
+  template_id String             @db.Uuid
+  template    ComplianceTemplate @relation(fields: [template_id], references: [id])
+  level       Int
+  approver_id String             @db.Uuid
+  company_id  String?            @db.Uuid
+  created_at  DateTime           @default(now())
+}
+
+model AMCTemplate {
+  id              String             @id @default(uuid()) @db.Uuid
+  name            String
+  frequency       String
+  approval_levels Int                @default(1)
+  company_id      String?            @db.Uuid
+  created_at      DateTime           @default(now())
+  approval_matrices AMCApprovalMatrix[]
+  amcs            AMC[]
+}
+
+model AMCApprovalMatrix {
+  id          String      @id @default(uuid()) @db.Uuid
+  template_id String      @db.Uuid
+  template    AMCTemplate @relation(fields: [template_id], references: [id])
+  level       Int
+  approver_id String      @db.Uuid
+  company_id  String?     @db.Uuid
+  created_at  DateTime    @default(now())
+}
+
+model Compliance {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  company_id             String                    @db.Uuid
+  company                Company                   @relation(fields: [company_id], references: [id])
+  name                   String                    @default("")
+  title                  String?
+  template_id            String                    @db.Uuid
+  template               ComplianceTemplate        @relation(fields: [template_id], references: [id])
+  department_id          String?                   @db.Uuid
+  department             Department?               @relation("ComplianceDepartment", fields: [department_id], references: [id])
+  function_id            String?                   @db.Uuid
+  businessFunction       BusinessFunction?         @relation("ComplianceFunction", fields: [function_id], references: [id])
+  assigned_user_id       String?                   @db.Uuid
+  assignedUser           User?                     @relation("ComplianceAssignedUser", fields: [assigned_user_id], references: [id])
+  start_date             DateTime?
+  due_date               DateTime
+  due_day                Int?
+  reminder_days          Int?
+  escalation_days        Int?
+  status_id              String                    @db.Uuid
+  statusMaster           StatusMaster              @relation("ComplianceStatus", fields: [status_id], references: [id])
+  status                 String                    @default("DRAFT")
+  current_approval_level Int                       @default(0)
+  current_level          Int                       @default(0)
+  submitted_by           String?                   @db.Uuid
+  approved_by            String?                   @db.Uuid
+  period_month           Int?
+  period_year            Int?
+  is_recurring_master    Boolean                   @default(false)
+  parent_id              String?                   @db.Uuid
+  created_at             DateTime                  @default(now())
+  approval_levels        ComplianceApprovalLevel[]
+}
+
+model AMC {
+  id                    String             @id @default(uuid()) @db.Uuid
+  company_id            String             @db.Uuid
+  company               Company            @relation(fields: [company_id], references: [id])
+  name                  String             @default("")
+  title                 String?
+  amc_template_id       String?            @db.Uuid
+  amcTemplate           AMCTemplate?       @relation(fields: [amc_template_id], references: [id])
+  department_id         String?            @db.Uuid
+  department            Department?        @relation("AMCDepartment", fields: [department_id], references: [id])
+  function_id           String?            @db.Uuid
+  businessFunction      BusinessFunction?  @relation("AMCFunction", fields: [function_id], references: [id])
+  assigned_user_id      String?            @db.Uuid
+  assignedUser          User?              @relation("AMCAssignedUser", fields: [assigned_user_id], references: [id])
+  asset_id              String?            @db.Uuid
+  asset                 Asset?             @relation(fields: [asset_id], references: [id])
+  vendor_id             String?            @db.Uuid
+  vendor                Vendor?            @relation(fields: [vendor_id], references: [id])
+  start_date            DateTime?
+  due_date              DateTime?
+  expiry_date           DateTime?
+  due_day               Int?
+  reminder_days         Int?
+  escalation_days       Int?
+  status_id             String             @db.Uuid
+  statusMaster          StatusMaster       @relation("AMCStatus", fields: [status_id], references: [id])
+  status                String             @default("DRAFT")
+  current_approval_level Int               @default(0)
+  current_level         Int                @default(0)
+  submitted_by          String?            @db.Uuid
+  submitted_at          DateTime?
+  approved_by           String?            @db.Uuid
+  remarks               String?
+  period_month          Int?
+  period_year           Int?
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @updatedAt
+  approval_levels       AMCApprovalLevel[]
+}
+
+model Document {
+  id          String   @id @default(uuid()) @db.Uuid
+  company_id  String   @db.Uuid
+  company     Company  @relation(fields: [company_id], references: [id])
+  module      ModuleType
+  record_id   String   @db.Uuid
+  file_path   String
+  uploaded_by String   @db.Uuid
+  uploaded_at DateTime @default(now())
+}
+
+model ApprovalLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  company_id   String   @db.Uuid
+  company      Company  @relation(fields: [company_id], references: [id])
+  module       ModuleType
+  record_id    String   @db.Uuid
+  level_number Int
+  action       Action
+  action_by    String   @db.Uuid
+  remarks      String?
+  timestamp    DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  company_id  String
+  user_id     String?
+  action      String
+  module      String
+  entity_type String?
+  entity_id   String?
+  description String?
+  created_at  DateTime @default(now())
+}
+
+model Department {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String
+  company_id  String?           @db.Uuid
+  company     Company?          @relation(fields: [company_id], references: [id])
+  created_at  DateTime          @default(now())
+  users       User[]
+  groups      Group[]
+  functions   BusinessFunction[]
+  compliances Compliance[]      @relation("ComplianceDepartment")
+  amcs        AMC[]             @relation("AMCDepartment")
+}
+
+model BusinessFunction {
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String
+  company_id    String?      @db.Uuid
+  company       Company?     @relation(fields: [company_id], references: [id])
+  department_id String?      @db.Uuid
+  department    Department?  @relation(fields: [department_id], references: [id])
+  created_at    DateTime     @default(now())
+  users         User[]
+  groups        Group[]
+  compliances   Compliance[] @relation("ComplianceFunction")
+  amcs          AMC[]        @relation("AMCFunction")
+
+  @@map("business_functions")
+}
+
+model Group {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  description     String?
+  company_id      String?           @db.Uuid
+  company         Company?          @relation(fields: [company_id], references: [id])
+  owner_id        String?           @db.Uuid
+  owner           User?             @relation("GroupOwner", fields: [owner_id], references: [id])
+  department_id   String?           @db.Uuid
+  department      Department?       @relation(fields: [department_id], references: [id])
+  function_id     String?           @db.Uuid
+  businessFunction BusinessFunction? @relation(fields: [function_id], references: [id])
+  created_at      DateTime          @default(now())
+  users           User[]            @relation("GroupMembers")
+}
+
+model Country {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  created_at DateTime  @default(now())
+  companies  Company[]
+}
+
+model RoleMaster {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  company_id String?  @db.Uuid
+  company    Company? @relation(fields: [company_id], references: [id])
+  created_at DateTime @default(now())
+}
+
+model ComplianceApprovalLevel {
+  id            String     @id @default(uuid()) @db.Uuid
+  compliance_id String     @db.Uuid
+  compliance    Compliance @relation(fields: [compliance_id], references: [id])
+  level         Int
+  approver_id   String     @db.Uuid
+  status        String     @default("PENDING")
+  remarks       String?
+  acted_at      DateTime?
+  created_at    DateTime   @default(now())
+
+  @@unique([compliance_id, level])
+}
+
+model AMCApprovalLevel {
+  id          String   @id @default(uuid()) @db.Uuid
+  amc_id      String   @db.Uuid
+  amc         AMC      @relation(fields: [amc_id], references: [id])
+  level       Int
+  approver_id String   @db.Uuid
+  approver    User     @relation(fields: [approver_id], references: [id])
+  status      String   @default("PENDING")
+  remarks     String?
+  acted_at    DateTime?
+  created_at  DateTime @default(now())
+
+  @@unique([amc_id, level])
+}
+
+model SmtpConfig {
+  id         String   @id @default(uuid()) @db.Uuid
+  company_id String   @db.Uuid
+  company    Company  @relation(fields: [company_id], references: [id])
+  host       String
+  port       Int      @default(587)
+  username   String
+  password   String
+  from_email String
+  secure     Boolean  @default(false)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([company_id])
+}
+
+model Notification {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
+  user          User     @relation(fields: [user_id], references: [id])
+  title         String
+  message       String
+  type          String
+  record_id     String?  @db.Uuid
+  record_module String?
+  is_read       Boolean  @default(false)
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+}
+
+model EmailTemplate {
+  id         String            @id @default(uuid()) @db.Uuid
+  company_id String            @db.Uuid
+  company    Company           @relation(fields: [company_id], references: [id])
+  type       EmailTemplateType
+  subject    String
+  body       String
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+
+  @@unique([company_id, type])
+}
+
+model SharePointConfig {
+  id               String   @id @default(uuid())
+  company_id       String
+  tenant_id        String
+  client_id        String
+  client_secret    String
+  site_url         String
+  document_library String
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+
+  @@unique([company_id])
+}
+
+model DmsSettings {
+  id                         String   @id @default(uuid())
+  company_id                 String
+  max_file_size_mb           Int      @default(10)
+  max_files_per_upload       Int      @default(20)
+  allow_user_folder_creation Boolean  @default(false)
+  created_at                 DateTime @default(now())
+
+  @@unique([company_id])
+}
+
+model DmsFolder {
+  id         String   @id @default(uuid())
+  company_id String
+  name       String
+  path       String
+  type       String   // USER | TEAM
+  parent_id  String?
+  created_by String
+  created_at DateTime @default(now())
+}
+
+model FolderPermission {
+  id          String   @id @default(uuid())
+  folder_id   String
+  access_type String   // USER | GROUP | DEPARTMENT | FUNCTION | COMPANY
+  access_id   String
+  can_read    Boolean  @default(false)
+  can_upload  Boolean  @default(false)
+  can_write   Boolean  @default(false)
+  can_delete  Boolean  @default(false)
+  created_at  DateTime @default(now())
+}
+
+model DmsActivityLog {
+  id          String   @id @default(uuid())
+  company_id  String
+  user_id     String
+  action      String   // CREATE_FOLDER | UPLOAD_FILE | RENAME | DELETE | DOWNLOAD
+  entity_type String   // "folder" | "file"
+  entity_id   String
+  entity_name String
+  details     String?  // optional JSON string e.g. {"old_name":"A","new_name":"B"}
+  created_at  DateTime @default(now())
+
+  @@index([company_id, created_at])
+  @@index([entity_id])
+}
+
+// DMS document — distinct from the existing Document model (compliance/AMC file attachments)
+model DmsDocument {
+  id                  String   @id @default(uuid())
+  company_id          String
+  name                String
+  file_url            String
+  folder_path         String
+  uploaded_by         String
+  reference_type      String?  // COMPLIANCE | AMC | GENERAL
+  reference_id        String?
+  sharepoint_item_id  String?  // Graph API DriveItem.id — used for preview/download/delete
+  drive_id            String?  // Graph API drive ID at upload time
+  created_at          DateTime @default(now())
+}
+
+/* ================================================================== */
+/*  Module Access Control                                               */
+/*                                                                      */
+/*  Module        — master list of toggleable product modules           */
+/*                  (AMC | COMPLIANCE | DMS, plus future ones).         */
+/*  CompanyModule — per-tenant enable/disable mapping.                  */
+/*                                                                      */
+/*  NOTE: distinct from `enum ModuleType` (used by Document/ApprovalLog */
+/*  to tag which workflow a record belongs to). The model below drives  */
+/*  feature gating for entire tenants.                                  */
+/* ================================================================== */
+
+model Module {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String          @unique          // AMC | COMPLIANCE | DMS
+  created_at      DateTime        @default(now())
+
+  company_modules CompanyModule[]
+}
+
+model CompanyModule {
+  id          String   @id @default(uuid()) @db.Uuid
+  company_id  String   @db.Uuid
+  module_id   String   @db.Uuid
+  enabled     Boolean  @default(true)
+
+  company     Company  @relation(fields: [company_id], references: [id])
+  module      Module   @relation(fields: [module_id], references: [id])
+
+  @@unique([company_id, module_id])
+}

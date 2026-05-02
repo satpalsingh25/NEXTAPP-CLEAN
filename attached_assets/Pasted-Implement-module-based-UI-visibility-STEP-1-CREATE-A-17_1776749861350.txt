@@ -1,0 +1,107 @@
+Implement module-based UI visibility.
+
+----------------------------------------
+STEP 1 — CREATE API
+----------------------------------------
+
+GET /api/modules
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+import { prisma } from "@/lib/prisma"
+
+export async function GET(req) {
+
+  const company_id = req.user.company_id
+
+  const modules = await prisma.module.findMany({
+    include: {
+      company_modules: {
+        where: { company_id }
+      }
+    }
+  })
+
+  const result = modules.map(m => {
+    const mapping = m.company_modules[0]
+
+    return {
+      name: m.name,
+      enabled: mapping ? mapping.enabled : true
+    }
+  })
+
+  return Response.json(result)
+}
+
+----------------------------------------
+STEP 2 — FRONTEND STATE
+----------------------------------------
+
+const [modules, setModules] = useState([])
+
+----------------------------------------
+STEP 3 — FETCH
+----------------------------------------
+
+useEffect(() => {
+  fetch("/api/modules")
+    .then(res => res.json())
+    .then(setModules)
+}, [])
+
+----------------------------------------
+STEP 4 — HELPER
+----------------------------------------
+
+function isEnabled(moduleName) {
+  return modules.find(m => m.name === moduleName)?.enabled
+}
+
+----------------------------------------
+STEP 5 — SIDEBAR CONTROL
+----------------------------------------
+
+Render conditionally:
+
+----------------------------------------
+AMC MENU
+----------------------------------------
+
+{isEnabled("AMC") && <AmcMenu />}
+
+----------------------------------------
+COMPLIANCE MENU
+----------------------------------------
+
+{isEnabled("COMPLIANCE") && <ComplianceMenu />}
+
+----------------------------------------
+DMS MENU
+----------------------------------------
+
+{isEnabled("DMS") && <DmsMenu />}
+
+----------------------------------------
+LOADING STATE
+----------------------------------------
+
+If modules not loaded:
+→ show nothing OR loader
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Default = visible (until API loads)
+✔ No crash if module not found
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Routing
+• API logic
+• Permissions

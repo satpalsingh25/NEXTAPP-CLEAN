@@ -1,0 +1,96 @@
+Update storage path logic to enforce standard SharePoint folder structure.
+
+----------------------------------------
+STEP 1 — GET COMPANY NAME
+----------------------------------------
+
+Fetch:
+
+const company = await prisma.company.findUnique({
+  where: { id: company_id }
+})
+
+----------------------------------------
+STEP 2 — GET USER NAME (IF NEEDED)
+----------------------------------------
+
+const user = await prisma.user.findUnique({
+  where: { id: user_id }
+})
+
+----------------------------------------
+STEP 3 — BUILD BASE PATH
+----------------------------------------
+
+let basePath = `/Company/${company.name}`
+
+----------------------------------------
+STEP 4 — MODULE STRUCTURE
+----------------------------------------
+
+IF module === "DMS":
+
+IF parent_path exists:
+  basePath += parent_path
+
+ELSE (My Files root):
+  basePath += `/Users/${user.name}`
+
+----------------------------------------
+IF module === "COMPLIANCE":
+
+basePath += `/Compliance/${record_id}`
+
+----------------------------------------
+IF module === "AMC":
+
+basePath += `/AMC/${record_id}`
+
+----------------------------------------
+STEP 5 — FINAL FILE PATH
+----------------------------------------
+
+const fullPath = `${basePath}/${fileName}`
+
+----------------------------------------
+STEP 6 — ENSURE FOLDERS EXIST
+----------------------------------------
+
+Before upload:
+
+✔ Check if folder exists in SharePoint
+✔ If not → create
+
+Folders to ensure:
+
+/Company
+/Company/{company.name}
+/Company/{company.name}/Users
+/Company/{company.name}/TeamFolder
+/Company/{company.name}/Compliance
+/Company/{company.name}/AMC
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+✔ Use company.name NOT company_id
+✔ Use user.name NOT user_id
+✔ Replace spaces with "_"
+✔ Remove special characters
+
+----------------------------------------
+EXAMPLE OUTPUT
+----------------------------------------
+
+/Company/ABC_Ltd/Users/Satpal/Invoice.pdf
+
+/Company/ABC_Ltd/Compliance/1234/report.pdf
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• DMS folder DB structure
+• Permissions
+• SharePoint API logic

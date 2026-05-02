@@ -1,0 +1,156 @@
+Implement backend API security layer (company isolation + permission enforcement)
+
+----------------------------------------
+STEP 1 — CREATE PERMISSION HELPER
+----------------------------------------
+
+Create:
+
+/lib/permission.ts
+
+----------------------------------------
+CODE
+----------------------------------------
+
+export function requireAuth(req) {
+  if (!req.user) {
+    throw new Error("Unauthorized")
+  }
+}
+
+export function requireRole(req, roles = []) {
+  if (!roles.includes(req.user.role)) {
+    throw new Error("Forbidden")
+  }
+}
+
+export function requireCompanyAccess(req, resourceCompanyId) {
+  if (req.user.company_id !== resourceCompanyId) {
+    throw new Error("Access denied")
+  }
+}
+
+----------------------------------------
+STEP 2 — USE IN ALL APIs
+----------------------------------------
+
+At top of every protected API:
+
+requireAuth(req)
+
+----------------------------------------
+STEP 3 — COMPANY ISOLATION
+----------------------------------------
+
+Whenever fetching data:
+
+✔ ALWAYS filter by company_id
+
+Example:
+
+await prisma.folder.findFirst({
+  where: {
+    id,
+    company_id: req.user.company_id
+  }
+})
+
+----------------------------------------
+STEP 4 — DMS FILE ACCESS CHECK
+----------------------------------------
+
+Before:
+
+✔ download
+✔ rename
+✔ delete
+✔ move
+
+Add:
+
+const file = await prisma.file.findFirst({
+  where: {
+    id: fileId,
+    company_id: req.user.company_id
+  }
+})
+
+if (!file) {
+  throw new Error("File not found or access denied")
+}
+
+----------------------------------------
+STEP 5 — FOLDER ACCESS CHECK
+----------------------------------------
+
+Same pattern:
+
+const folder = await prisma.folder.findFirst({
+  where: {
+    id: folderId,
+    company_id: req.user.company_id
+  }
+})
+
+----------------------------------------
+STEP 6 — ADMIN PROTECTION
+----------------------------------------
+
+For admin APIs:
+
+requireRole(req, ["ADMIN", "SUPER_ADMIN"])
+
+----------------------------------------
+STEP 7 — SUPER ADMIN CONTROL
+----------------------------------------
+
+For global actions:
+
+requireRole(req, ["SUPER_ADMIN"])
+
+----------------------------------------
+STEP 8 — SAFE ERROR RESPONSE
+----------------------------------------
+
+Wrap APIs:
+
+try {
+  // logic
+} catch (err) {
+  return Response.json({
+    error: "Access denied"
+  }, { status: 403 })
+}
+
+----------------------------------------
+STEP 9 — BLOCK DIRECT ID ACCESS
+----------------------------------------
+
+Never trust ID from frontend
+
+✔ Always validate via DB
+✔ Always match company_id
+
+----------------------------------------
+STEP 10 — OPTIONAL (IMPORTANT)
+----------------------------------------
+
+Add logging on access denied:
+
+console.warn("Unauthorized access attempt", req.user?.id)
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ Complex RBAC system
+❌ Over-engineering
+❌ Performance-heavy checks
+
+----------------------------------------
+KEEP IT SIMPLE
+----------------------------------------
+
+✔ Validate
+✔ Restrict
+✔ Protect

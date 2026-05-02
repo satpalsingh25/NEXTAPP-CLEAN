@@ -1,0 +1,215 @@
+Upgrade Branding system to full application-level control.
+
+----------------------------------------
+STEP 1 — UPDATE SCHEMA
+----------------------------------------
+
+Add new fields in Branding model:
+
+model Branding {
+  id               String   @id @default(uuid())
+  company_id       String   @unique
+
+  app_name         String?     // "Compliance & AMC"
+  browser_title    String?
+
+  logo_base64      String?
+
+  login_banner     String?     // base64 image
+  login_footer     String?     // text below button
+  login_bg         String?     // color or image
+
+  primary_color    String?
+  secondary_color  String?
+
+  theme_mode       String   @default("light")
+
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id])
+}
+
+----------------------------------------
+RUN
+----------------------------------------
+
+npx prisma migrate dev
+
+----------------------------------------
+STEP 2 — UPDATE API
+----------------------------------------
+
+POST /api/branding
+
+Accept all new fields:
+
+app_name
+browser_title
+logo_base64
+login_banner
+login_footer
+login_bg
+theme_mode
+
+----------------------------------------
+STEP 3 — BRANDING PAGE UI
+----------------------------------------
+
+Add new fields:
+
+----------------------------------------
+SECTION: APP SETTINGS
+----------------------------------------
+
+App Name → input
+Browser Title → input
+
+----------------------------------------
+SECTION: LOGIN PAGE
+----------------------------------------
+
+Upload Banner
+Textarea → Footer Text
+Input → Background (color or image)
+
+----------------------------------------
+SECTION: PREVIEW
+----------------------------------------
+
+✔ Show logo
+✔ Show banner preview
+✔ Show background preview
+
+----------------------------------------
+SAVE → same API
+
+----------------------------------------
+STEP 4 — APPLY APP NAME
+----------------------------------------
+
+In sidebar header:
+
+Replace:
+
+"Compliance & AMC"
+
+WITH:
+
+branding.app_name || "Default App"
+
+----------------------------------------
+STEP 5 — APPLY BROWSER TITLE
+----------------------------------------
+
+In layout:
+
+useEffect(() => {
+  document.title = branding.browser_title || "App"
+}, [branding])
+
+----------------------------------------
+STEP 6 — LOGIN PAGE UPDATE
+----------------------------------------
+
+In login page:
+
+----------------------------------------
+TOP BANNER
+----------------------------------------
+
+if (branding.login_banner):
+  show image above "Sign In"
+
+----------------------------------------
+BACKGROUND
+----------------------------------------
+
+if (branding.login_bg starts with "#"):
+  apply background color
+
+else if (image):
+  apply background image
+
+----------------------------------------
+FOOTER TEXT
+----------------------------------------
+
+Show below Sign In button:
+
+branding.login_footer
+
+----------------------------------------
+STEP 7 — THEME FIX (CRITICAL)
+----------------------------------------
+
+Create CSS variables:
+
+:root {
+  --bg: #ffffff;
+  --text: #111827;
+  --card: #f9fafb;
+}
+
+.dark {
+  --bg: #111827;
+  --text: #f9fafb;
+  --card: #1f2937;
+}
+
+----------------------------------------
+APPLY GLOBALLY
+----------------------------------------
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+----------------------------------------
+STEP 8 — FIX HEADER COLORS
+----------------------------------------
+
+Replace ALL hardcoded:
+
+❌ text-black
+❌ bg-white
+
+WITH:
+
+✔ color: var(--text)
+✔ background: var(--card)
+
+----------------------------------------
+STEP 9 — APPLY PRIMARY COLOR
+----------------------------------------
+
+Buttons:
+
+style={{ backgroundColor: branding.primary_color }}
+
+----------------------------------------
+STEP 10 — SAFE FALLBACK
+----------------------------------------
+
+If missing:
+
+app_name = "Compliance & AMC"
+browser_title = "App"
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ No SharePoint
+✔ No modal usage
+✔ Works for all roles
+✔ No breaking changes
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Modules
+• Permissions
+• Storage system

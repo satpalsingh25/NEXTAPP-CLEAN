@@ -1,0 +1,112 @@
+Create Audit Log system (lightweight, scalable, no performance impact)
+
+----------------------------------------
+STEP 1 — SCHEMA
+----------------------------------------
+
+Add new model:
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  company_id   String
+  user_id      String?
+  action       String   // CREATE_FOLDER, UPLOAD_FILE, LOGIN, etc.
+  module       String   // DMS, COMPLIANCE, AMC, ADMIN
+  entity_type  String?  // file, folder, user, etc.
+  entity_id    String?
+  description  String?
+  created_at   DateTime @default(now())
+}
+
+----------------------------------------
+RUN
+----------------------------------------
+
+npx prisma migrate dev
+
+----------------------------------------
+STEP 2 — LOG UTILITY
+----------------------------------------
+
+Create:
+
+/lib/audit-log.ts
+
+----------------------------------------
+CODE
+----------------------------------------
+
+import prisma from "@/lib/prisma"
+
+export async function logAudit({
+  company_id,
+  user_id,
+  action,
+  module,
+  entity_type,
+  entity_id,
+  description
+}) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        company_id,
+        user_id,
+        action,
+        module,
+        entity_type,
+        entity_id,
+        description
+      }
+    })
+  } catch (err) {
+    console.error("Audit log failed", err)
+  }
+}
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Never throw error
+✔ Never block main API
+✔ Silent fail only
+
+----------------------------------------
+STEP 3 — TEST HOOK (OPTIONAL)
+----------------------------------------
+
+Add temporary log in any API:
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "TEST_ACTION",
+  module: "SYSTEM",
+  description: "Audit log working"
+})
+
+----------------------------------------
+STEP 4 — VERIFY
+----------------------------------------
+
+Check DB:
+
+SELECT * FROM "AuditLog" ORDER BY created_at DESC;
+
+----------------------------------------
+DO NOT ADD YET
+----------------------------------------
+
+❌ No UI
+❌ No filters
+❌ No heavy data
+❌ No old/new values tracking
+
+----------------------------------------
+KEEP IT CLEAN
+----------------------------------------
+
+✔ Simple
+✔ Fast
+✔ Reliable

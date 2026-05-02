@@ -1,0 +1,124 @@
+Create Branding Settings Modal for Admin.
+
+----------------------------------------
+LOCATION
+----------------------------------------
+
+Add in:
+
+Admin → Company page
+OR global Admin menu
+
+Button:
+
+[ Branding Settings ]
+
+----------------------------------------
+MODAL
+----------------------------------------
+
+Title: Branding Settings
+
+----------------------------------------
+STATE
+----------------------------------------
+
+const [branding, setBranding] = useState(null)
+const [logoPreview, setLogoPreview] = useState(null)
+
+----------------------------------------
+FETCH DATA
+----------------------------------------
+
+On modal open:
+
+GET /api/branding
+
+----------------------------------------
+UI LAYOUT
+----------------------------------------
+
+SECTION 1 — LOGO
+
+[ Upload Logo ]
+
+If logo exists:
+→ show preview image
+
+----------------------------------------
+UPLOAD HANDLER
+----------------------------------------
+
+onFileChange:
+
+const formData = new FormData()
+formData.append("file", file)
+
+POST /api/branding/upload-logo
+
+on success:
+✔ update logoPreview
+✔ update branding.logo_url
+
+----------------------------------------
+SECTION 2 — THEME MODE
+
+Toggle:
+
+( ) Light
+( ) Dark
+
+----------------------------------------
+SECTION 3 — COLORS (OPTIONAL DISPLAY)
+
+Primary Color: show color box
+Secondary Color: show color box
+
+(read-only for now)
+
+----------------------------------------
+SAVE BUTTON
+----------------------------------------
+
+[ Save Settings ]
+
+----------------------------------------
+ON SAVE
+----------------------------------------
+
+POST /api/branding
+
+Body:
+{
+  logo_url,
+  theme_mode
+}
+
+----------------------------------------
+SUCCESS
+----------------------------------------
+
+✔ Toast: "Branding updated"
+✔ Close modal
+
+----------------------------------------
+UX NOTES
+----------------------------------------
+
+✔ Clean spacing
+✔ Card-style sections
+✔ Show loading state
+
+----------------------------------------
+PERMISSIONS
+----------------------------------------
+
+✔ Only Super Admin
+✔ Company Admin (own company)
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ No complex color picker yet
+❌ No multi-theme support

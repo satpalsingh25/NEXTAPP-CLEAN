@@ -1,0 +1,96 @@
+Create branding APIs.
+
+----------------------------------------
+GET API
+----------------------------------------
+
+GET /api/branding
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+import { prisma } from "@/lib/prisma"
+
+export async function GET(req) {
+
+  const company_id = req.user.company_id
+
+  let branding = await prisma.branding.findUnique({
+    where: { company_id }
+  })
+
+  // If not exists → create default
+  if (!branding) {
+    branding = await prisma.branding.create({
+      data: { company_id }
+    })
+  }
+
+  return Response.json(branding)
+}
+
+----------------------------------------
+POST API (SAVE / UPDATE)
+----------------------------------------
+
+POST /api/branding
+
+Body:
+{
+  logo_url,
+  primary_color,
+  secondary_color,
+  theme_mode
+}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+export async function POST(req) {
+
+  const company_id = req.user.company_id
+  const body = await req.json()
+
+  const branding = await prisma.branding.upsert({
+    where: { company_id },
+    update: {
+      logo_url: body.logo_url,
+      primary_color: body.primary_color,
+      secondary_color: body.secondary_color,
+      theme_mode: body.theme_mode
+    },
+    create: {
+      company_id,
+      logo_url: body.logo_url,
+      primary_color: body.primary_color,
+      secondary_color: body.secondary_color,
+      theme_mode: body.theme_mode
+    }
+  })
+
+  return Response.json({ success: true, branding })
+}
+
+----------------------------------------
+ACCESS CONTROL
+----------------------------------------
+
+✔ Allow:
+  • Super Admin
+  • Company Admin
+
+----------------------------------------
+VALIDATION (LIGHT)
+----------------------------------------
+
+✔ theme_mode = light | dark
+✔ colors must be valid hex
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Auth system
+• Company model

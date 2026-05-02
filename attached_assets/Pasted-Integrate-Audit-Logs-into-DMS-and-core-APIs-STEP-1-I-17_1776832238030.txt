@@ -1,0 +1,146 @@
+Integrate Audit Logs into DMS and core APIs.
+
+----------------------------------------
+STEP 1 — IMPORT
+----------------------------------------
+
+import { logAudit } from "@/lib/audit-log"
+
+----------------------------------------
+STEP 2 — DMS: CREATE FOLDER
+----------------------------------------
+
+After success:
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "CREATE_FOLDER",
+  module: "DMS",
+  entity_type: "folder",
+  entity_id: folder.id,
+  description: `Created folder ${folder.name}`
+})
+
+----------------------------------------
+STEP 3 — DMS: UPLOAD FILE
+----------------------------------------
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "UPLOAD_FILE",
+  module: "DMS",
+  entity_type: "file",
+  entity_id: file.id,
+  description: `Uploaded file ${file.name}`
+})
+
+----------------------------------------
+STEP 4 — DMS: DELETE FILE
+----------------------------------------
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "DELETE_FILE",
+  module: "DMS",
+  entity_type: "file",
+  entity_id: file.id,
+  description: `Deleted file ${file.name}`
+})
+
+----------------------------------------
+STEP 5 — DMS: RENAME
+----------------------------------------
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "RENAME",
+  module: "DMS",
+  entity_type: type, // file or folder
+  entity_id: id,
+  description: `Renamed to ${newName}`
+})
+
+----------------------------------------
+STEP 6 — DMS: DOWNLOAD
+----------------------------------------
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "DOWNLOAD_FILE",
+  module: "DMS",
+  entity_type: "file",
+  entity_id: file.id,
+  description: `Downloaded ${file.name}`
+})
+
+----------------------------------------
+STEP 7 — PERMISSION CHANGE
+----------------------------------------
+
+await logAudit({
+  company_id: req.user.company_id,
+  user_id: req.user.id,
+  action: "PERMISSION_UPDATE",
+  module: "DMS",
+  entity_type: "folder",
+  entity_id: folder.id,
+  description: `Updated permissions`
+})
+
+----------------------------------------
+STEP 8 — BRANDING UPDATE
+----------------------------------------
+
+In POST /api/branding:
+
+await logAudit({
+  company_id,
+  user_id: req.user.id,
+  action: "UPDATE_BRANDING",
+  module: "ADMIN",
+  entity_type: "branding",
+  description: "Updated branding settings"
+})
+
+----------------------------------------
+STEP 9 — USER CREATE / UPDATE
+----------------------------------------
+
+await logAudit({
+  company_id,
+  user_id: req.user.id,
+  action: "USER_UPDATE",
+  module: "ADMIN",
+  entity_type: "user",
+  entity_id: user.id,
+  description: `Updated user ${user.name}`
+})
+
+----------------------------------------
+STEP 10 — KEEP IT LIGHT
+----------------------------------------
+
+✔ No loops
+✔ No bulk logging
+✔ Only key actions
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ Always after success
+✔ Never block API
+✔ No await chaining delays (optional fire-and-forget)
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ No UI yet
+❌ No filters
+❌ No complex JSON

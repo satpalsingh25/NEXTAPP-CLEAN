@@ -1,0 +1,142 @@
+Create Audit Log UI with filters and pagination.
+
+----------------------------------------
+STEP 1 — API
+----------------------------------------
+
+GET /api/audit-logs
+
+----------------------------------------
+QUERY PARAMS
+----------------------------------------
+
+?module=
+&action=
+&user_id=
+&from=
+&to=
+&page=1
+&limit=20
+
+----------------------------------------
+BACKEND LOGIC
+----------------------------------------
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url)
+
+  const module = searchParams.get("module")
+  const action = searchParams.get("action")
+  const user_id = searchParams.get("user_id")
+  const from = searchParams.get("from")
+  const to = searchParams.get("to")
+  const page = Number(searchParams.get("page") || 1)
+  const limit = Number(searchParams.get("limit") || 20)
+
+  const where = {
+    company_id: req.user.company_id
+  }
+
+  if (module) where.module = module
+  if (action) where.action = action
+  if (user_id) where.user_id = user_id
+
+  if (from || to) {
+    where.created_at = {}
+    if (from) where.created_at.gte = new Date(from)
+    if (to) where.created_at.lte = new Date(to)
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    where,
+    orderBy: { created_at: "desc" },
+    skip: (page - 1) * limit,
+    take: limit
+  })
+
+  return Response.json(logs)
+}
+
+----------------------------------------
+STEP 2 — PAGE UI
+----------------------------------------
+
+Create:
+
+/admin/audit-logs/page.tsx
+
+----------------------------------------
+FILTER BAR
+----------------------------------------
+
+✔ Module dropdown
+✔ Action dropdown
+✔ Date range picker
+✔ Search button
+
+----------------------------------------
+TABLE COLUMNS
+----------------------------------------
+
+Date
+User
+Module
+Action
+Description
+
+----------------------------------------
+UI LOGIC
+----------------------------------------
+
+fetch("/api/audit-logs")
+
+----------------------------------------
+STEP 3 — PAGINATION
+----------------------------------------
+
+✔ Next / Previous buttons
+✔ Limit = 20
+
+----------------------------------------
+STEP 4 — FORMAT DATE
+----------------------------------------
+
+new Date(log.created_at).toLocaleString()
+
+----------------------------------------
+STEP 5 — USER NAME
+----------------------------------------
+
+Optional:
+
+Join user name OR show user_id
+
+----------------------------------------
+STEP 6 — EMPTY STATE
+----------------------------------------
+
+"No activity found"
+
+----------------------------------------
+STEP 7 — MENU ADD
+----------------------------------------
+
+Add sidebar item:
+
+Audit Logs → /admin/audit-logs
+
+----------------------------------------
+STEP 8 — PERFORMANCE
+----------------------------------------
+
+✔ Always paginate
+✔ No full fetch
+✔ Max limit 50
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ Export
+❌ Advanced filters
+❌ Graphs

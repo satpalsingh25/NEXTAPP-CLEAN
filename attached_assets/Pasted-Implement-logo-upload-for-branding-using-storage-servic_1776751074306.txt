@@ -1,0 +1,111 @@
+Implement logo upload for branding using storage service.
+
+----------------------------------------
+STEP 1 — CREATE API
+----------------------------------------
+
+POST /api/branding/upload-logo
+
+----------------------------------------
+IMPORT
+----------------------------------------
+
+import { uploadFile } from "@/lib/storage"
+import { prisma } from "@/lib/prisma"
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+export async function POST(req) {
+
+  const company_id = req.user.company_id
+  const user_id = req.user.user_id
+
+  const formData = await req.formData()
+  const file = formData.get("file")
+
+  if (!file) {
+    return Response.json({ error: "File required" }, { status: 400 })
+  }
+
+----------------------------------------
+VALIDATION
+----------------------------------------
+
+✔ Allow only:
+  image/png
+  image/jpeg
+  image/webp
+
+----------------------------------------
+UPLOAD
+----------------------------------------
+
+const result = await uploadFile({
+  file,
+  fileName: file.name,
+  mimeType: file.type,
+  company_id,
+  user_id,
+  module: "DMS",   // reuse DMS storage path
+  parent_path: `/Branding`
+})
+
+----------------------------------------
+SAVE IN DB
+----------------------------------------
+
+await prisma.branding.upsert({
+  where: { company_id },
+  update: { logo_url: result.path },
+  create: {
+    company_id,
+    logo_url: result.path
+  }
+})
+
+----------------------------------------
+RETURN
+----------------------------------------
+
+return Response.json({
+  success: true,
+  logo_url: result.path
+})
+}
+
+----------------------------------------
+FRONTEND
+----------------------------------------
+
+1. Add Upload button in Branding modal:
+
+[ Upload Logo ]
+
+----------------------------------------
+ON SELECT FILE
+----------------------------------------
+
+• call API with FormData
+
+----------------------------------------
+ON SUCCESS
+----------------------------------------
+
+✔ Show preview
+✔ Save logo_url
+
+----------------------------------------
+UI
+----------------------------------------
+
+✔ Show logo preview
+✔ Replace existing logo
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Storage service
+• SharePoint config

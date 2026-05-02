@@ -1,0 +1,236 @@
+Implement Branding system using database storage (no SharePoint).
+
+----------------------------------------
+STEP 1 — UPDATE SCHEMA
+----------------------------------------
+
+Update Branding model:
+
+model Branding {
+  id             String   @id @default(uuid())
+  company_id     String   @unique
+
+  logo_base64    String?  // store image as base64
+  primary_color  String?
+  secondary_color String?
+
+  theme_mode     String   @default("light")
+
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id])
+}
+
+----------------------------------------
+RUN
+----------------------------------------
+
+npx prisma migrate dev
+
+----------------------------------------
+STEP 2 — API (GET)
+----------------------------------------
+
+GET /api/branding
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+export async function GET(req) {
+  const company_id = req.user.company_id
+
+  let branding = await prisma.branding.findUnique({
+    where: { company_id }
+  })
+
+  if (!branding) {
+    branding = await prisma.branding.create({
+      data: { company_id }
+    })
+  }
+
+  return Response.json(branding)
+}
+
+----------------------------------------
+STEP 3 — API (SAVE)
+----------------------------------------
+
+POST /api/branding
+
+Body:
+{
+  logo_base64,
+  theme_mode
+}
+
+----------------------------------------
+LOGIC
+----------------------------------------
+
+export async function POST(req) {
+  const company_id = req.user.company_id
+  const body = await req.json()
+
+  const branding = await prisma.branding.upsert({
+    where: { company_id },
+    update: {
+      logo_base64: body.logo_base64,
+      theme_mode: body.theme_mode
+    },
+    create: {
+      company_id,
+      logo_base64: body.logo_base64,
+      theme_mode: body.theme_mode
+    }
+  })
+
+  return Response.json({ success: true, branding })
+}
+
+----------------------------------------
+STEP 4 — BRANDING PAGE
+----------------------------------------
+
+Route:
+
+/admin/company-settings/branding
+
+----------------------------------------
+UI
+----------------------------------------
+
+Title: Branding Settings
+
+----------------------------------------
+STATE
+----------------------------------------
+
+const [branding, setBranding] = useState(null)
+const [logoPreview, setLogoPreview] = useState(null)
+
+----------------------------------------
+LOAD DATA
+----------------------------------------
+
+useEffect(() => {
+  fetch("/api/branding")
+    .then(res => res.json())
+    .then(data => {
+      setBranding(data)
+      setLogoPreview(data.logo_base64)
+    })
+}, [])
+
+----------------------------------------
+UPLOAD LOGO
+----------------------------------------
+
+<input type="file" accept="image/*" />
+
+onChange:
+
+const file = e.target.files[0]
+
+const reader = new FileReader()
+
+reader.onloadend = () => {
+  setLogoPreview(reader.result)
+  setBranding(prev => ({
+    ...prev,
+    logo_base64: reader.result
+  }))
+}
+
+reader.readAsDataURL(file)
+
+----------------------------------------
+THEME TOGGLE
+----------------------------------------
+
+<select
+  value={branding?.theme_mode}
+  onChange={(e) =>
+    setBranding(prev => ({
+      ...prev,
+      theme_mode: e.target.value
+    }))
+  }
+>
+  <option value="light">Light</option>
+  <option value="dark">Dark</option>
+</select>
+
+----------------------------------------
+SAVE
+----------------------------------------
+
+<button onClick={saveBranding}>Save</button>
+
+----------------------------------------
+SAVE FUNCTION
+----------------------------------------
+
+async function saveBranding() {
+  await fetch("/api/branding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(branding)
+  })
+
+  alert("Branding updated")
+}
+
+----------------------------------------
+STEP 5 — APPLY THEME GLOBALLY
+----------------------------------------
+
+In root layout:
+
+useEffect(() => {
+  fetch("/api/branding")
+    .then(res => res.json())
+    .then(data => {
+      if (data.theme_mode === "dark") {
+        document.body.classList.add("dark")
+      } else {
+        document.body.classList.remove("dark")
+      }
+    })
+}, [])
+
+----------------------------------------
+STEP 6 — HEADER LOGO
+----------------------------------------
+
+if (branding.logo_base64) {
+  <img src={branding.logo_base64} />
+}
+
+----------------------------------------
+MENU LINK
+----------------------------------------
+
+Sidebar:
+
+Branding → /admin/company-settings/branding
+
+----------------------------------------
+IMPORTANT
+----------------------------------------
+
+✔ No SharePoint usage
+✔ No upload API needed
+✔ No external dependency
+✔ Works offline
+✔ Works without DMS module
+
+----------------------------------------
+DO NOT CHANGE
+----------------------------------------
+
+• Other modules
+• Storage service
+• Permissions
