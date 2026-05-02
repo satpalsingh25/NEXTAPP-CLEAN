@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorResponse, generateRequestId, SP_ERRORS } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
@@ -88,10 +90,9 @@ export async function GET(
       getSharePointToken(company_id),
     ]);
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: `SharePoint configuration error: ${(e as Error).message}` },
-      { status: 502 },
-    );
+    const requestId = generateRequestId();
+    logInternalError(e, { route: "GET /api/files/preview/[id]", user_id, company_id, request_id: requestId, meta: { doc_id: doc.id } });
+    return errorResponse(SP_ERRORS.CONFIG, 502, requestId);
   }
 
   /* 5. Fetch file content from Microsoft Graph API ------------------ */
@@ -105,18 +106,19 @@ export async function GET(
       redirect: "follow",
     });
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: `Failed to reach SharePoint: ${(e as Error).message}` },
-      { status: 502 },
-    );
+    const requestId = generateRequestId();
+    logInternalError(e, { route: "GET /api/files/preview/[id]", user_id, company_id, request_id: requestId });
+    return errorResponse(SP_ERRORS.NETWORK, 502, requestId);
   }
 
   if (!spRes.ok) {
     const errJson = await spRes.json().catch(() => ({})) as { error?: { message?: string } };
-    return NextResponse.json(
-      { error: `SharePoint returned ${spRes.status}: ${errJson?.error?.message ?? spRes.statusText}` },
-      { status: 502 },
+    const requestId = generateRequestId();
+    logInternalError(
+      new Error(`SharePoint ${spRes.status}: ${errJson?.error?.message ?? spRes.statusText}`),
+      { route: "GET /api/files/preview/[id]", user_id, company_id, request_id: requestId, meta: { status: spRes.status } },
     );
+    return errorResponse(SP_ERRORS.FETCH, 502, requestId);
   }
 
   /* 6. Audit log (fire-and-forget) ---------------------------------- */

@@ -5,6 +5,8 @@ import crypto            from "crypto";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateRequiredString, ValidationError } from "@/lib/validation";
 import { logAudit }      from "@/lib/audit-log";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 /* ------------------------------------------------------------------ */
 /*  POST /api/auth/reset-password                                       */
@@ -106,5 +108,9 @@ export async function POST(req: NextRequest) {
     description: `Password reset completed from IP ${ip}`,
   });
 
-  return NextResponse.json({ success: true, message: "Password updated. Please log in with your new password." });
+  const requestId = generateRequestId();
+  return NextResponse.json(
+    { success: true, message: "Password updated. Please log in with your new password." },
+    { headers: { "X-Request-Id": requestId } },
+  );
 }

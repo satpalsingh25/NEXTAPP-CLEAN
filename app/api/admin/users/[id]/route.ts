@@ -4,6 +4,8 @@ import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
 import { logAudit }        from "@/lib/audit-log";
 import { checkRateLimit }  from "@/lib/rate-limit";
 import { validateUUID, validateEmail, validateOptionalString, ValidationError } from "@/lib/validation";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 const USER_SELECT = {
   id: true,
@@ -34,9 +36,10 @@ export async function GET(
     const user = await prisma.user.findUnique({ where: { id }, select: USER_SELECT });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
     return NextResponse.json(user);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to load user" }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "GET /api/admin/users/[id]", user_id: auth.user.user_id, company_id: auth.user.company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }
 
@@ -95,9 +98,10 @@ export async function PUT(
     void logAudit({ company_id: auth.user.company_id, user_id: auth.user.user_id, action: "USER_UPDATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Updated user ${user.name || user.email}` });
 
     return NextResponse.json(user);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "PUT /api/admin/users/[id]", user_id: auth.user.user_id, company_id: auth.user.company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }
 
@@ -116,8 +120,9 @@ export async function DELETE(
     await prisma.auditLog.deleteMany({ where: { user_id: id } });
     await prisma.user.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "DELETE /api/admin/users/[id]", user_id: auth.user.user_id, company_id: auth.user.company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }

@@ -4,6 +4,8 @@ import crypto               from "crypto";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateEmail, ValidationError } from "@/lib/validation";
 import { logAudit }         from "@/lib/audit-log";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 /* ------------------------------------------------------------------ */
 /*  POST /api/auth/forgot-password                                      */
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
 
   /* Always return the same message whether the email exists or not
      to prevent user enumeration. */
+  const requestId = generateRequestId();
   const SAFE_RESPONSE = {
     message:
       "If that email is registered, a reset token has been generated. " +
@@ -83,10 +86,13 @@ export async function POST(req: NextRequest) {
 
   /* In production: send rawToken by email instead of returning it.
      Return it here only to allow admin-assisted out-of-band delivery. */
-  return NextResponse.json({
-    ...SAFE_RESPONSE,
-    /* DEVELOPMENT ONLY — remove once SMTP is configured */
-    _dev_token: rawToken,
-    _dev_expires_at: expiresAt,
-  });
+  return NextResponse.json(
+    {
+      ...SAFE_RESPONSE,
+      /* DEVELOPMENT ONLY — remove once SMTP is configured */
+      _dev_token:      rawToken,
+      _dev_expires_at: expiresAt,
+    },
+    { headers: { "X-Request-Id": requestId } },
+  );
 }

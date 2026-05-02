@@ -3,6 +3,8 @@ import { prisma }                   from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth.server";
 import { logAudit }                from "@/lib/audit-log";
 import { checkRateLimit }          from "@/lib/rate-limit";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -22,12 +24,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No company context." }, { status: 400 });
   }
 
-  let branding = await prisma.branding.findUnique({ where: { company_id } });
-  if (!branding) {
-    branding = await prisma.branding.create({ data: { company_id } });
+  try {
+    let branding = await prisma.branding.findUnique({ where: { company_id } });
+    if (!branding) {
+      branding = await prisma.branding.create({ data: { company_id } });
+    }
+    return NextResponse.json(branding);
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "GET /api/branding", user_id: auth.user.user_id, company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
-
-  return NextResponse.json(branding);
 }
 
 /* ------------------------------------------------------------------ */
@@ -122,13 +129,19 @@ export async function POST(req: NextRequest) {
   assignIfPresent("secondary_color", secondary_color);
   if (typeof theme_mode === "string") patch.theme_mode = theme_mode;
 
-  const branding = await prisma.branding.upsert({
-    where:  { company_id },
-    update: patch,
-    create: { company_id, ...patch },
-  });
+  try {
+    const branding = await prisma.branding.upsert({
+      where:  { company_id },
+      update: patch,
+      create: { company_id, ...patch },
+    });
 
-  void logAudit({ company_id, user_id: auth.user.user_id, action: "UPDATE_BRANDING", module: "ADMIN", entity_type: "branding", description: "Updated branding settings" });
+    void logAudit({ company_id, user_id: auth.user.user_id, action: "UPDATE_BRANDING", module: "ADMIN", entity_type: "branding", description: "Updated branding settings" });
 
-  return NextResponse.json({ success: true, branding });
+    return NextResponse.json({ success: true, branding });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "POST /api/branding", user_id: auth.user.user_id, company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
+  }
 }

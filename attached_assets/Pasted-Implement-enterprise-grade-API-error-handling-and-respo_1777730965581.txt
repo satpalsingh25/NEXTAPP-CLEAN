@@ -1,0 +1,146 @@
+Implement enterprise-grade API error handling and response hardening.
+
+----------------------------------------
+STEP 1 — CREATE RESPONSE HELPERS
+----------------------------------------
+
+Create:
+
+/lib/api-response.ts
+
+----------------------------------------
+FUNCTIONS
+----------------------------------------
+
+successResponse(data)
+errorResponse(message, status = 400)
+
+----------------------------------------
+STANDARD FORMAT
+----------------------------------------
+
+Success:
+{
+  success: true,
+  data
+}
+
+Error:
+{
+  success: false,
+  error: "Safe message"
+}
+
+----------------------------------------
+STEP 2 — CENTRALIZE TRY/CATCH
+----------------------------------------
+
+All APIs:
+
+try {
+   ...
+} catch (err) {
+   logInternalError(err)
+   return errorResponse("Something went wrong", 500)
+}
+
+----------------------------------------
+STEP 3 — SAFE INTERNAL LOGGING
+----------------------------------------
+
+Create:
+
+/lib/error-log.ts
+
+----------------------------------------
+RULES
+----------------------------------------
+
+✔ Log full internal error server-side
+✔ Never expose to frontend
+✔ Include:
+   - route
+   - user_id
+   - timestamp
+
+----------------------------------------
+STEP 4 — HIDE SENSITIVE DETAILS
+----------------------------------------
+
+Never expose:
+
+❌ SQL errors
+❌ Prisma errors
+❌ Stack traces
+❌ SharePoint raw errors
+❌ Token details
+
+----------------------------------------
+STEP 5 — STANDARD STATUS CODES
+----------------------------------------
+
+400 → Invalid input
+401 → Unauthorized
+403 → Forbidden
+404 → Not found
+429 → Rate limited
+500 → Internal error
+
+----------------------------------------
+STEP 6 — VALIDATION CONSISTENCY
+----------------------------------------
+
+All validation errors:
+
+✔ Uniform response format
+
+----------------------------------------
+STEP 7 — OPTIONAL REQUEST ID
+----------------------------------------
+
+Add trace ID for debugging if practical
+
+----------------------------------------
+STEP 8 — FRONTEND SAFE HANDLING
+----------------------------------------
+
+Frontend should show:
+
+✔ Friendly messages only
+
+Examples:
+"Access denied"
+"Invalid input"
+"File not found"
+
+----------------------------------------
+STEP 9 — SHAREPOINT FAILURES
+----------------------------------------
+
+Convert raw provider errors into safe responses
+
+----------------------------------------
+STEP 10 — AUDIT CRITICAL FAILURES
+----------------------------------------
+
+Optional:
+✔ Security violation logs
+✔ Repeated abuse logs
+
+----------------------------------------
+DO NOT ADD
+----------------------------------------
+
+❌ Full observability platform
+❌ Sentry
+❌ Third-party logging
+❌ Complex APM
+
+----------------------------------------
+KEEP IT LIGHT
+----------------------------------------
+
+✔ Secure
+✔ Consistent
+✔ Maintainable
+✔ Replit-friendly

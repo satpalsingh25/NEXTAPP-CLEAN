@@ -9,6 +9,8 @@ import { gateModule } from "@/lib/module-access";
 import { logAudit } from "@/lib/audit-log";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateRequiredString, validateUUID, ValidationError } from "@/lib/validation";
+import { errorResponse, generateRequestId, SP_ERRORS } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 /* Build breadcrumb trail by walking up the parent chain */
 async function buildBreadcrumbs(
@@ -264,9 +266,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     /* Roll back the DB record so state stays consistent */
     await prisma.dmsFolder.delete({ where: { id: folder.id } }).catch(() => {});
-    const message = err instanceof Error ? err.message : "SharePoint folder creation failed.";
-    console.error("[POST /api/dms/folders] SharePoint createFolder failed:", { company_id, folderPath, message });
-    return NextResponse.json({ error: message }, { status: 502 });
+    const requestId = generateRequestId();
+    logInternalError(err, {
+      route:      "POST /api/dms/folders",
+      user_id,
+      company_id,
+      request_id: requestId,
+      meta:       { folderPath },
+    });
+    return errorResponse(SP_ERRORS.FOLDER, 502, requestId);
   }
 
   void logDmsActivity({

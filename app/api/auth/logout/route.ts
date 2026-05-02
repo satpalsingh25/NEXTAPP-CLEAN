@@ -3,6 +3,7 @@ import { prisma }    from "@/lib/prisma";
 import jwt           from "jsonwebtoken";
 import { logAudit }  from "@/lib/audit-log";
 import { getClientIp } from "@/lib/rate-limit";
+import { logInternalError } from "@/lib/error-log";
 
 /* ------------------------------------------------------------------ */
 /*  POST /api/auth/logout                                               */
@@ -43,8 +44,12 @@ export async function POST(req: NextRequest) {
           description: `User logged out from IP ${ip}`,
         });
       }
-    } catch {
-      /* Token already expired or invalid — ignore, still clear the cookie */
+    } catch (err) {
+      /* Token already expired or invalid — ignore, still clear the cookie.
+         Log anything that isn't a simple verification error. */
+      if (!(err instanceof Error && err.name === "JsonWebTokenError")) {
+        logInternalError(err, { route: "POST /api/auth/logout" });
+      }
     }
   }
 

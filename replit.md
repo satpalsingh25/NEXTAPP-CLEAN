@@ -86,6 +86,15 @@ scripts/                Utility scripts (seed-modules, reset-admin, fix-folder-p
 - **Multi-tenant JWT**: every token carries `user_id`, `company_id`, `role`, `session_id`
 - **Error security**: login always returns "Invalid credentials" — never reveals account existence or wrong-password specifics
 
+### API Error Handling (`lib/api-response.ts` + `lib/error-log.ts`)
+- **`errorResponse(msg, status, requestId?)`** — always returns `{ success: false, error }` — never raw Prisma/SQL/SharePoint details
+- **`successResponse(data, status, requestId?)`** — returns `{ success: true, data }` for new routes
+- **`generateRequestId()`** — 8-char hex trace ID added to every error response as `X-Request-Id` header
+- **`logInternalError(err, ctx)`** — structured JSON to stderr: timestamp, route, user_id, company_id, request_id, message, stack — never sent to client
+- **`logSecurityEvent(event, ctx)`** — SECURITY-level warnings for repeated abuse
+- **`SP_ERRORS`** constants — safe SharePoint error messages (CONFIG / NETWORK / FETCH / UPLOAD / FOLDER)
+- Applied to 13 routes: auth (login/logout/forgot-password/reset-password), compliance/submit, amc/submit, admin/users (×2), branding, dms/upload, dms/folders, files/download, files/preview
+
 ### Rate Limiting (`lib/rate-limit.ts`)
 In-memory sliding window per (identifier × route):
 - `login` preset: 10 req / 15 min (IP-keyed)

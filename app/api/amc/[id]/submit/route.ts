@@ -4,6 +4,8 @@ import { requireRole, SUBMIT_ROLES } from "@/lib/auth.server";
 import { gateModule }      from "@/lib/module-access";
 import { checkRateLimit }  from "@/lib/rate-limit";
 import { sanitizeText }    from "@/lib/validation";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 export async function POST(
   req: NextRequest,
@@ -97,7 +99,14 @@ export async function POST(
 
     const nextApprover = record.approval_levels.find((al) => al.level === 1);
     return NextResponse.json({ ...updated, next_approver: nextApprover ?? null });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, {
+      route:      "POST /api/amc/[id]/submit",
+      user_id,
+      company_id,
+      request_id: requestId,
+    });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }

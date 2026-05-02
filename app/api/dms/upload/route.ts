@@ -9,6 +9,8 @@ import { gateModule }         from "@/lib/module-access";
 import { logAudit }           from "@/lib/audit-log";
 import { checkRateLimit }     from "@/lib/rate-limit";
 import { validateUUID, validateFileName, validateFileExtension, ValidationError } from "@/lib/validation";
+import { errorResponse, generateRequestId, SP_ERRORS } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 /* ------------------------------------------------------------------ */
 /* POST /api/dms/upload                                                 */
@@ -106,10 +108,9 @@ export async function POST(req: NextRequest) {
       getSharePointToken(company_id),
     ]);
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: `SharePoint configuration error: ${(e as Error).message}` },
-      { status: 502 },
-    );
+    const requestId = generateRequestId();
+    logInternalError(e, { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId });
+    return errorResponse(SP_ERRORS.CONFIG, 502, requestId);
   }
 
   /* 6. Upload each file to SharePoint & save metadata --------------- */
@@ -144,14 +145,12 @@ export async function POST(req: NextRequest) {
 
       if (!uploadRes.ok) {
         const errJson = await uploadRes.json().catch(() => ({})) as { error?: { message?: string } };
-        return NextResponse.json(
-          {
-            error: `Failed to upload "${filename}": ${
-              errJson?.error?.message ?? uploadRes.statusText
-            }`,
-          },
-          { status: 502 },
+        const requestId = generateRequestId();
+        logInternalError(
+          new Error(`SharePoint upload failed for "${filename}": ${errJson?.error?.message ?? uploadRes.statusText}`),
+          { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId, meta: { filename, status: uploadRes.status } },
         );
+        return errorResponse(SP_ERRORS.UPLOAD, 502, requestId);
       }
 
       const spFile = await uploadRes.json() as {
@@ -162,10 +161,9 @@ export async function POST(req: NextRequest) {
       spItemId = spFile.id ?? null;
 
     } catch (e: unknown) {
-      return NextResponse.json(
-        { error: `Upload error for "${filename}": ${(e as Error).message}` },
-        { status: 502 },
-      );
+      const requestId = generateRequestId();
+      logInternalError(e, { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId, meta: { filename } });
+      return errorResponse(SP_ERRORS.UPLOAD, 502, requestId);
     }
 
     const doc = await prisma.dmsDocument.create({

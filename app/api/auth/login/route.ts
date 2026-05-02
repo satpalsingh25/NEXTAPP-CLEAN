@@ -5,6 +5,8 @@ import jwt                from "jsonwebtoken";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateEmail, validateRequiredString, ValidationError } from "@/lib/validation";
 import { logAudit }       from "@/lib/audit-log";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 /* ------------------------------------------------------------------ */
 /*  Session constants                                                    */
@@ -185,7 +187,9 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch (error: unknown) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "POST /api/auth/login", request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }

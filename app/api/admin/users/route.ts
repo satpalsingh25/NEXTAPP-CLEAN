@@ -5,6 +5,8 @@ import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
 import { logAudit }        from "@/lib/audit-log";
 import { checkRateLimit }  from "@/lib/rate-limit";
 import { validateEmail, validateRequiredString, validateOptionalString, ValidationError } from "@/lib/validation";
+import { errorResponse, generateRequestId } from "@/lib/api-response";
+import { logInternalError } from "@/lib/error-log";
 
 const USER_SELECT = {
   id: true,
@@ -37,9 +39,10 @@ export async function GET(req: NextRequest) {
       orderBy: { created_at: "desc" },
     });
     return NextResponse.json(users);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "GET /api/admin/users", user_id: auth.user.user_id, company_id: auth.user.company_id, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }
 
@@ -107,8 +110,9 @@ export async function POST(req: NextRequest) {
     void logAudit({ company_id, user_id: actorId, action: "USER_CREATE", module: "ADMIN", entity_type: "user", entity_id: user.id, description: `Created user ${user.name || user.email}` });
 
     return NextResponse.json(user, { status: 201 });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+  } catch (err) {
+    const requestId = generateRequestId();
+    logInternalError(err, { route: "POST /api/admin/users", user_id: actorId, company_id: authCompanyId, request_id: requestId });
+    return errorResponse("Something went wrong. Please try again.", 500, requestId);
   }
 }
