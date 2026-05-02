@@ -44,6 +44,16 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+# Next.js build output
+.next/
+
+# Local env files (contain secrets)
+.env.local
+.env*.local
+
+# Editor temp files
+*~
+
 # Replit
 .cache/
 .local/

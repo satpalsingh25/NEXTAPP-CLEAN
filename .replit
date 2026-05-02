@@ -43,7 +43,6 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "278b561202b5411190e457686a494fe153e8901a0fce301bfd55b11e7d7c8908"
 NEXT_TELEMETRY_DISABLED = "1"
 
 [[ports]]
