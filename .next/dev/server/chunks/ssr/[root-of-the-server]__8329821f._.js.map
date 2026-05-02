@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 22, "column": 0}, "map": {"version":3,"sources":["file:///home/runner/workspace/app/auth/layout.tsx"],"sourcesContent":["import { cookies } from \"next/headers\";\nimport { redirect } from \"next/navigation\";\nimport jwt from \"jsonwebtoken\";\n\nconst JWT_SECRET = process.env.JWT_SECRET || \"fallback-secret\";\n\nexport default async function AuthLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  const cookieStore = await cookies();\n  const token = cookieStore.get(\"token\")?.value;\n\n  if (token) {\n    try {\n      jwt.verify(token, JWT_SECRET);\n      redirect(\"/dashboard\");\n    } catch {\n      // token invalid — show login page\n    }\n  }\n\n  return (\n    <div className=\"min-h-screen bg-slate-50\">\n      {children}\n    </div>\n  );\n}\n"],"names":[],"mappings":";;;;;AAAA;AACA;AAAA;AACA;;;;;AAEA,MAAM,aAAa,QAAQ,GAAG,CAAC,UAAU,IAAI;AAE9B,eAAe,WAAW,EACvC,QAAQ,EAGT;IACC,MAAM,cAAc,MAAM,IAAA,0IAAO;IACjC,MAAM,QAAQ,YAAY,GAAG,CAAC,UAAU;IAExC,IAAI,OAAO;QACT,IAAI;YACF,gJAAG,CAAC,MAAM,CAAC,OAAO;YAClB,IAAA,iMAAQ,EAAC;QACX,EAAE,OAAM;QACN,kCAAkC;QACpC;IACF;IAEA,qBACE,8OAAC;QAAI,WAAU;kBACZ;;;;;;AAGP"}}]
-}
