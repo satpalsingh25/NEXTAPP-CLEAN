@@ -1,9 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import Sidebar from "./Sidebar";
-import Header from "./Header";
-import { useAuth } from "@/context/AuthContext";
+import { usePathname }       from "next/navigation";
+import Sidebar               from "./Sidebar";
+import Header                from "./Header";
+import { useAuth }           from "@/context/AuthContext";
+import IdleTimeoutGuard      from "./IdleTimeoutGuard";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,14 +27,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   // Middleware guarantees only authenticated users reach here
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header />
-        <main className="flex-1 p-8 overflow-y-auto">
-          {children}
-        </main>
+    <>
+      {/* Step 2: Force re-login after 30 min idle, warn at 25 min */}
+      <IdleTimeoutGuard />
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <Header />
+          <main className="flex-1 p-8 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

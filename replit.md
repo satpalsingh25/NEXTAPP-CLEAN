@@ -73,6 +73,30 @@ scripts/                Utility scripts (seed-modules, reset-admin, fix-folder-p
 - **AMC** — Annual Maintenance Contract management
 - **DMS** — Document Management System (requires SharePoint configuration)
 
+## Security
+
+### Authentication & Session Hardening
+- **JWT expiry**: 10 hours (down from 24 h) — `SESSION_HOURS` constant in `app/api/auth/login/route.ts`
+- **Idle timeout**: 30-minute client-side idle detection (`hooks/useIdleTimeout.ts` + `components/IdleTimeoutGuard.tsx`); warning shown at 25 min
+- **Cookies**: HttpOnly + Secure (production) + SameSite=None (cross-origin Replit) or Lax (local)
+- **Login audit**: every LOGIN_SUCCESS / LOGIN_FAILED / LOGIN_BLOCKED / LOGOUT written to `AuditLog` with IP
+- **Account lockout**: 5 failed attempts → 15-minute lockout (`User.locked_until`, `User.failed_login_attempts`)
+- **Password reset**: cryptographically secure one-time tokens (`PasswordResetToken` table) — SHA-256 stored, raw token returned to caller; 1-hour TTL; invalidated on use or new request
+- **Session records**: `UserSession` table tracks active sessions (ip, user_agent, expires_at, last_active) — `session_id` embedded in JWT for future force-logout
+- **Multi-tenant JWT**: every token carries `user_id`, `company_id`, `role`, `session_id`
+- **Error security**: login always returns "Invalid credentials" — never reveals account existence or wrong-password specifics
+
+### Rate Limiting (`lib/rate-limit.ts`)
+In-memory sliding window per (identifier × route):
+- `login` preset: 10 req / 15 min (IP-keyed)
+- `upload` preset: 20 req / 15 min
+- `write` preset: 30 req / 15 min
+- `submit` preset: 20 req / 15 min
+- `files` preset: 100 req / 15 min
+
+### Input Validation (`lib/validation.ts`)
+`validateEmail`, `validateRequiredString`, `validateUUID`, `validateFileName`, `validateFileExtension`, `sanitizeText` — applied to all write routes.
+
 ## Important Notes
 
 - The `pnpm-workspace.yaml` and `artifacts/` directory are Replit workspace scaffolding — they do not affect the app.

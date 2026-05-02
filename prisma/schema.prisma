@@ -107,12 +107,15 @@ model User {
   businessFunction    BusinessFunction? @relation(fields: [function_id], references: [id])
   group_id            String?           @db.Uuid
   group               Group?            @relation("GroupMembers", fields: [group_id], references: [id])
-  owned_groups           Group[]           @relation("GroupOwner")
-  created_at             DateTime          @default(now())
-  assigned_compliances   Compliance[]      @relation("ComplianceAssignedUser")
-  assigned_amcs          AMC[]             @relation("AMCAssignedUser")
-  amc_approval_levels    AMCApprovalLevel[]
-  notifications          Notification[]
+  owned_groups             Group[]           @relation("GroupOwner")
+  created_at               DateTime          @default(now())
+  assigned_compliances     Compliance[]      @relation("ComplianceAssignedUser")
+  assigned_amcs            AMC[]             @relation("AMCAssignedUser")
+  amc_approval_levels      AMCApprovalLevel[]
+  notifications            Notification[]
+  /* ── Security fields ───────────────────────────── */
+  failed_login_attempts    Int               @default(0)
+  locked_until             DateTime?
 }
 
 model Vendor {
@@ -556,4 +559,40 @@ model CompanyModule {
   module      Module   @relation(fields: [module_id], references: [id])
 
   @@unique([company_id, module_id])
+}
+
+/* ------------------------------------------------------------------ */
+/* UserSession — tracks active sessions for admin visibility /         */
+/* future force-logout support (Step 8).                               */
+/* user_id / company_id stored as plain strings (no FK) for           */
+/* lightweight operation — integrity enforced at application layer.    */
+/* ------------------------------------------------------------------ */
+model UserSession {
+  id          String   @id @default(uuid())
+  user_id     String
+  company_id  String
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime @default(now())
+  last_active DateTime @default(now())
+  expires_at  DateTime
+  is_active   Boolean  @default(true)
+
+  @@index([user_id])
+  @@index([user_id, is_active])
+}
+
+/* ------------------------------------------------------------------ */
+/* PasswordResetToken — short-lived one-time reset tokens (Step 6).   */
+/* token_hash stores SHA-256(rawToken); raw token goes to the user.   */
+/* ------------------------------------------------------------------ */
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id])
 }

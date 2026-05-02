@@ -1,0 +1,122 @@
+Implement enterprise-grade session and authentication hardening.
+
+----------------------------------------
+STEP 1 — SESSION EXPIRY
+----------------------------------------
+
+Set session/token expiry:
+
+Recommended:
+✔ 8–12 hours active max
+
+----------------------------------------
+STEP 2 — IDLE TIMEOUT
+----------------------------------------
+
+If inactive for:
+
+✔ 30–60 minutes
+
+Force re-login
+
+----------------------------------------
+STEP 3 — SECURE COOKIE SETTINGS
+----------------------------------------
+
+Enable:
+
+✔ HttpOnly
+✔ Secure (production)
+✔ SameSite=Lax or Strict
+✔ Proper expiration
+
+----------------------------------------
+STEP 4 — LOGIN AUDIT
+----------------------------------------
+
+On successful login:
+
+action: LOGIN_SUCCESS
+
+On failed login:
+
+action: LOGIN_FAILED
+
+Log:
+✔ user/email
+✔ IP if available
+✔ timestamp
+
+----------------------------------------
+STEP 5 — FAILED LOGIN LIMIT
+----------------------------------------
+
+Basic protection:
+
+✔ Lockout after repeated failures
+OR
+✔ Temporary cooldown
+
+----------------------------------------
+STEP 6 — PASSWORD RESET SECURITY
+----------------------------------------
+
+✔ Short-lived reset tokens
+✔ One-time use
+✔ Secure random token generation
+
+----------------------------------------
+STEP 7 — LOGOUT SECURITY
+----------------------------------------
+
+✔ Proper session destroy
+✔ Cookie invalidation
+
+----------------------------------------
+STEP 8 — ADMIN SESSION CONTROL (LIGHT)
+----------------------------------------
+
+Prepare architecture for future:
+
+✔ View active sessions
+✔ Force logout
+
+(No full UI yet)
+
+----------------------------------------
+STEP 9 — MULTI-TENANT SAFETY
+----------------------------------------
+
+Session always includes:
+
+✔ user_id
+✔ company_id
+✔ role
+
+----------------------------------------
+STEP 10 — ERROR SECURITY
+----------------------------------------
+
+❌ Do not reveal:
+- Wrong password
+- User existence
+
+✔ Use:
+"Invalid credentials"
+
+----------------------------------------
+DO NOT ADD YET
+----------------------------------------
+
+❌ MFA
+❌ Azure AD
+❌ Device fingerprinting
+❌ SSO
+
+----------------------------------------
+KEEP IT PRACTICAL
+----------------------------------------
+
+✔ Secure
+✔ Lightweight
+✔ Production-safe
