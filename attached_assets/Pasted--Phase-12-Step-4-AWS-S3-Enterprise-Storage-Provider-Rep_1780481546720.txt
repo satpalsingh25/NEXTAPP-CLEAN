@@ -1,0 +1,333 @@
+# 🚀 Phase 12 — Step 4
+
+# AWS S3 Enterprise Storage Provider
+
+## Replit Optimized Prompt
+
+```text id="p12step4prompt"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 12 Step 1 → Storage architecture
+- Phase 12 Step 2 → SharePoint provider refactor
+- Phase 12 Step 3 → Google Drive provider
+- Storage UI refactor with:
+  ✔ Single Storage Providers page
+  ✔ Dynamic provider modals
+  ✔ Help tab
+  ✔ Provider field components
+
+Current providers working:
+- SharePoint
+- Google Drive
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Implement AWS S3 as enterprise storage provider.
+
+Requirements:
+- Use unified storage architecture
+- Use dynamic provider modal
+- Integrate with:
+  - DMS
+  - AMC
+  - Compliance
+
+Must support:
+- S3 buckets
+- Folder/prefix structure
+- Signed URLs
+- Secure uploads/downloads
+- Multi-company isolation
+
+====================================================
+1. INSTALL REQUIRED PACKAGES
+====================================================
+
+Install stable AWS SDK packages compatible with current Next.js version.
+
+Requirements:
+- S3 support
+- Signed URL support
+- Multipart upload support
+
+====================================================
+2. IMPLEMENT AWS S3 PROVIDER
+====================================================
+
+Implement:
+
+/lib/storage/providers/aws-s3-provider.ts
+
+Must implement:
+
+StorageProviderInterface
+
+====================================================
+3. IMPLEMENT REQUIRED METHODS
+====================================================
+
+Implement:
+
+- uploadFile()
+- downloadFile()
+- deleteFile()
+- createFolder()
+- renameFile()
+- renameFolder()
+- generatePreviewUrl()
+- generateDownloadUrl()
+- testConnection()
+
+====================================================
+4. AWS CONFIGURATION SUPPORT
+====================================================
+
+Store in:
+configuration_json
+
+Fields:
+
+- region
+- bucket_name
+- access_key
+- secret_key
+- root_prefix
+
+====================================================
+5. DYNAMIC MODAL INTEGRATION
+====================================================
+
+Use existing:
+
+StorageProviderModal
+
+and:
+
+/components/storage/provider-fields/aws-s3-fields.tsx
+
+NO separate pages.
+
+====================================================
+6. AWS S3 FIELD COMPONENT
+====================================================
+
+Fields:
+
+- Provider Name
+- Region
+- Bucket Name
+- Access Key
+- Secret Key
+- Root Prefix
+
+Buttons:
+- Test Connection
+- Save
+
+Requirements:
+- masked secrets
+- validation
+- dark/light support
+
+====================================================
+7. S3 CONNECTION TEST
+====================================================
+
+Implement:
+
+testConnection()
+
+Validate:
+- credentials
+- bucket access
+- read/write permissions
+- region validity
+
+Show:
+- success/failure status
+
+====================================================
+8. STORAGE SERVICE INTEGRATION
+====================================================
+
+Update:
+
+storage-service.ts
+
+Requirements:
+- resolve S3 provider
+- route uploads/downloads correctly
+- provider-agnostic architecture
+
+====================================================
+9. S3 FOLDER STRUCTURE
+====================================================
+
+Implement enterprise prefix structure.
+
+Examples:
+
+Compliance/
+AMC/
+DMS/
+
+Project folders
+Department folders
+Year folders
+
+Requirements:
+- same behavior as SharePoint
+- same behavior as Google Drive
+
+====================================================
+10. DMS INTEGRATION
+====================================================
+
+DMS must support:
+- S3 upload
+- Preview
+- Download
+- Rename
+- Delete
+- Bulk download
+
+====================================================
+11. COMPLIANCE INTEGRATION
+====================================================
+
+Compliance must support:
+- S3 uploads
+- Existing workflows
+- Existing folder structures
+
+====================================================
+12. AMC INTEGRATION
+====================================================
+
+AMC must support:
+- S3 uploads
+- Existing workflows
+- Existing folder logic
+
+====================================================
+13. SIGNED URL SUPPORT
+====================================================
+
+Implement:
+- secure preview URLs
+- secure download URLs
+
+Requirements:
+- expiration support
+- temporary access
+- no public bucket requirement
+
+====================================================
+14. LARGE FILE SUPPORT
+====================================================
+
+Support:
+- multipart uploads
+- large file streaming
+
+Requirements:
+- avoid memory overload
+- scalable uploads
+
+====================================================
+15. DOCUMENT METADATA
+====================================================
+
+Store:
+- storage_provider_id
+- external_file_id
+- external_path
+
+for S3 uploads.
+
+====================================================
+16. SECURITY REQUIREMENTS
+====================================================
+
+Requirements:
+- secure credential storage
+- no secret exposure
+- validate provider ownership
+- validate company ownership
+
+Prevent:
+- public bucket misuse
+- cross-company access
+
+====================================================
+17. AUDIT LOGGING
+====================================================
+
+Log:
+- uploads
+- downloads
+- deletes
+- provider updates
+- connection tests
+
+Use existing audit system.
+
+====================================================
+18. HELP TAB UPDATE
+====================================================
+
+Update Storage Providers → Help tab.
+
+Add:
+AWS S3 Setup Guide
+
+Explain:
+- bucket creation
+- IAM user creation
+- access keys
+- permissions
+- regions
+- CORS if needed
+
+====================================================
+19. IMPORTANT RULES
+====================================================
+
+- DO NOT break SharePoint
+- DO NOT break Google Drive
+- DO NOT create separate AWS pages
+- DO NOT create new menus
+- Must use unified modal architecture
+
+====================================================
+20. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- SharePoint works
+- Google Drive works
+- AWS S3 works
+- Existing uploads work
+- Preview/download works
+- Dynamic modal works
+- No TS errors
+- App boots cleanly
+
+====================================================
+21. OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- APIs updated
+- AWS setup instructions
+- Required IAM permissions
+- Bucket policy examples
+- Upload architecture summary
+```

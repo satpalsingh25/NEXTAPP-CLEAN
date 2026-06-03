@@ -1,0 +1,368 @@
+You are working on NEXTAPP-CLEAN.
+
+DO NOT change any backend functionality.
+DO NOT modify APIs.
+DO NOT modify authentication logic.
+DO NOT modify permissions.
+DO NOT modify database schema.
+DO NOT change upload/storage logic.
+DO NOT modify routing behavior.
+
+This task is ONLY for UI/UX redesign and layout improvements.
+
+====================================================
+GOAL
+====
+
+Refactor the Authentication Settings and overall Admin UI to match a modern enterprise dashboard design similar to the provided reference.
+
+The current functionality already works.
+
+Only redesign the UI/UX while preserving ALL functionality.
+
+====================================================
+MAIN REQUIREMENTS
+=================
+
+✔ Remove help/setup content from Login Method tab
+✔ Keep Help content only in Help tab
+✔ Add modern collapsible sidebar
+✔ Keep Light/Dark theme toggle working exactly as current
+✔ Apply enterprise dashboard styling
+✔ Keep all existing menus and functionality untouched
+✔ Make UI similar to provided design reference
+
+====================================================
+
+1. REMOVE HELP CONTENT FROM LOGIN METHOD TAB
+   ====================================================
+
+Currently:
+Authentication Settings → Login Method
+
+contains:
+
+* Azure AD setup instructions
+* LDAP setup instructions
+* instructional content blocks
+
+REMOVE all instructional/help content from:
+Login Method tab.
+
+Reason:
+This content already exists in:
+Authentication Settings → Help tab
+
+DO NOT remove Help tab content.
+
+====================================================
+2. LOGIN METHOD TAB FINAL DESIGN
+================================
+
+Create a clean enterprise empty-state layout.
+
+Layout:
+
+---
+
+[ Icon ]
+
+Title:
+Login Methods
+
+Description:
+Configure authentication methods and instructions for your organization.
+
+Secondary Text:
+Select another tab to manage identity providers, login providers, or setup instructions.
+
+---
+
+Requirements:
+
+* centered layout
+* modern card design
+* dark/light theme compatible
+* responsive
+
+====================================================
+3. KEEP LIGHT/DARK THEME TOGGLE
+===============================
+
+IMPORTANT:
+Keep existing theme toggle exactly working.
+
+Requirements:
+
+* theme toggle visible globally
+* near profile/logout area
+* instant theme switching
+* persist theme selection
+* no functionality changes
+
+Fix all existing dark mode issues:
+
+* black text on black background
+* invisible headers
+* unreadable cards
+* unreadable tables
+
+Ensure:
+
+* all pages support both themes correctly
+* tabs readable
+* modals readable
+* headers readable
+
+====================================================
+4. MODERN SIDEBAR REDESIGN
+==========================
+
+Refactor sidebar UI only.
+
+Requirements:
+
+* modern enterprise appearance
+* better spacing
+* aligned icons
+* active menu highlight
+* hover effects
+* soft borders
+* dark gradient background
+* cleaner typography
+
+DO NOT change menu structure.
+
+====================================================
+5. ADD SIDEBAR COLLAPSE BUTTON
+==============================
+
+Add:
+Sidebar collapse/expand button.
+
+Behavior:
+
+* collapse sidebar into icon-only mode
+* expand back normally
+* smooth transition animation
+* preserve active menu state
+* persist collapse state if possible
+
+Placement:
+Bottom-left of sidebar.
+
+When expanded:
+<< Collapse
+
+When collapsed:
+
+> >
+
+or icon-only button
+
+====================================================
+6. KEEP EXISTING MENU STRUCTURE
+===============================
+
+Keep exactly:
+
+Admin
+├── Country
+├── Companies
+├── Departments
+├── Functions
+├── Users
+├── Groups
+├── Roles
+├── Company Settings
+├── Authentication Settings
+├── Storage Providers
+├── Mail Settings
+├── DMS Settings
+
+DO NOT add/remove menus.
+
+====================================================
+7. MODERN PAGE HEADER DESIGN
+============================
+
+Refactor page headers.
+
+Structure:
+
+Title
+Subtitle/description
+
+Example:
+
+Authentication Settings
+Manage identity providers and enterprise authentication configuration.
+
+Requirements:
+
+* larger title
+* proper spacing
+* enterprise typography
+* theme compatibility
+
+====================================================
+8. MODERN TAB DESIGN
+====================
+
+Refactor all tabs.
+
+Tabs:
+
+* Login Method
+* Identity Providers
+* Group Mapping
+* Password Policy
+* Login Activity
+* Help
+
+Requirements:
+
+* modern horizontal tabs
+* active tab highlight
+* subtle glow/underline
+* smooth transitions
+* dark/light compatibility
+
+====================================================
+9. ENTERPRISE CARD DESIGN
+=========================
+
+Apply consistent card styling:
+
+* rounded corners
+* subtle shadows
+* glass-like appearance
+* border styling
+* theme-aware colors
+
+====================================================
+10. STORAGE PROVIDERS PAGE UI
+=============================
+
+Apply SAME enterprise UI style to:
+Admin → Storage Providers
+
+DO NOT change functionality.
+
+Keep:
+
+* dynamic provider modals
+* provider table
+* help tab
+* provider forms
+
+Only improve appearance.
+
+====================================================
+11. RESPONSIVE DESIGN
+=====================
+
+Ensure:
+
+* desktop optimized
+* tablet optimized
+* mobile optimized
+
+Sidebar:
+
+* collapsible on desktop
+* drawer mode on mobile
+
+====================================================
+12. MODERN ANIMATIONS
+=====================
+
+Add subtle animations:
+
+* sidebar collapse
+* tab switching
+* hover transitions
+* modal transitions
+* card fade-in
+
+DO NOT overanimate.
+
+====================================================
+13. REUSABLE LAYOUT COMPONENTS
+==============================
+
+Refactor into reusable layout components if needed.
+
+Suggested:
+
+/components/layout/
+
+* app-sidebar.tsx
+* app-header.tsx
+* app-tabs.tsx
+* page-header.tsx
+* theme-toggle.tsx
+
+====================================================
+14. THEME REQUIREMENTS
+======================
+
+Themes must support:
+✔ dark mode
+✔ light mode
+✔ branding engine
+✔ custom company branding
+
+Fix:
+
+* invisible text
+* unreadable tables
+* unreadable modals
+* unreadable dropdowns
+* unreadable tabs
+
+====================================================
+15. IMPORTANT RULES
+===================
+
+DO NOT:
+
+* modify backend logic
+* modify APIs
+* modify authentication flows
+* modify database
+* modify storage functionality
+* modify permissions
+
+ONLY redesign UI/UX.
+
+====================================================
+16. FINAL VALIDATION
+====================
+
+After implementation verify:
+
+✔ Login Method tab cleaned
+✔ Help content only in Help tab
+✔ Sidebar collapse works
+✔ Theme toggle works exactly as before
+✔ Dark theme fixed
+✔ Light theme fixed
+✔ Responsive layout works
+✔ Existing functionality untouched
+✔ Existing APIs untouched
+✔ No TS errors
+✔ App boots cleanly
+
+====================================================
+17. OUTPUT
+==========
+
+At completion provide:
+
+* Files updated
+* Components created
+* Sidebar redesign summary
+* Theme improvements summary
+* Responsive behavior summary
+* Confirmation no functionality changed

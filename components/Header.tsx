@@ -11,13 +11,13 @@ export default function Header() {
   const { user, loading, logout } = useAuth();
   const { branding } = useBranding();
 
-  const hasLogo  = !!branding.logo_base64;
-  const logoSrc  = branding.logo_base64 ?? "";
-  const appName  = branding.app_name || "Compliance & AMC";
+  const hasLogo = !!branding.logo_base64;
+  const logoSrc = branding.logo_base64 ?? "";
+  const appName = branding.app_name || "Compliance & AMC";
 
   return (
     <header
-      className="h-16 flex items-center justify-between px-8 sticky top-0 z-10 border-b"
+      className="h-16 flex items-center justify-between px-6 sticky top-0 z-10 border-b"
       style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}
     >
       <div className="hidden md:flex items-center gap-3">
@@ -30,42 +30,59 @@ export default function Header() {
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         ) : (
-          <span className="text-sm" style={{ color: "var(--muted)" }}>{appName}</span>
+          <span className="text-sm font-medium" style={{ color: "var(--muted)" }}>{appName}</span>
         )}
       </div>
       <div className="md:hidden font-bold" style={{ color: "var(--text)" }}>{appName}</div>
 
-      <div className="flex items-center space-x-3">
-        <a href="/dashboard" className="mr-2 text-sm text-slate-700 hover:text-slate-900 transition-colors">Dashboard</a>
-        <a href="/admin" className="mr-2 text-sm text-slate-700 hover:text-slate-900 transition-colors">Admin</a>
+      <div className="flex items-center gap-2">
+        <a
+          href="/dashboard"
+          className="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+          style={{ color: "var(--muted)" }}
+        >
+          Dashboard
+        </a>
+        <a
+          href="/admin"
+          className="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+          style={{ color: "var(--muted)" }}
+        >
+          Admin
+        </a>
+
+        <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
 
         <ThemeToggle />
 
         {user && <NotificationBell />}
 
         {loading ? (
-          <div className="h-4 w-24 bg-slate-100 rounded animate-pulse" />
+          <div className="h-4 w-24 rounded animate-pulse" style={{ background: "var(--border)" }} />
         ) : user ? (
           <>
-            <div className="flex items-center space-x-2 text-sm text-slate-700">
-              <UserCircle size={20} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 text-sm pl-1" style={{ color: "var(--muted)" }}>
+              <UserCircle size={18} style={{ color: "var(--muted)" }} />
               <span className="hidden sm:inline">{user.email}</span>
-              <span className="text-xs text-slate-400 hidden sm:inline">({user.role})</span>
+              <span className="text-xs hidden sm:inline" style={{ color: "var(--muted)", opacity: 0.7 }}>
+                ({user.role})
+              </span>
             </div>
             <button
               onClick={logout}
-              className="flex items-center space-x-1 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 border border-red-200 rounded-md hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30 transition-colors"
             >
-              <LogOut size={15} />
+              <LogOut size={14} />
               <span>Logout</span>
             </button>
           </>
         ) : (
           <Link
             href="/auth/login"
-            className="flex items-center space-x-1 px-3 py-1.5 text-sm text-slate-700 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors"
+            style={{ color: "var(--text)", borderColor: "var(--border)" }}
           >
-            <LogIn size={15} />
+            <LogIn size={14} />
             <span>Login</span>
           </Link>
         )}

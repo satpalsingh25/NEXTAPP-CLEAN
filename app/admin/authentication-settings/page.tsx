@@ -199,17 +199,17 @@ function Toggle({
   label: string; description?: string; checked: boolean; onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start gap-4 py-3 border-b border-slate-100 last:border-0">
+    <div className="flex items-start gap-4 py-3 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
       <button
         type="button" role="switch" aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative mt-0.5 shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${checked ? "bg-blue-600" : "bg-slate-200"}`}
+        className={`relative mt-0.5 shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${checked ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
       >
         <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
       </button>
       <div className="cursor-pointer select-none" onClick={() => onChange(!checked)}>
-        <p className="text-sm font-medium text-slate-800">{label}</p>
-        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+        <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{label}</p>
+        {description && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{description}</p>}
       </div>
     </div>
   );
@@ -1058,17 +1058,18 @@ function AccordionItem({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="border rounded-xl overflow-hidden" style={{ borderColor: "var(--border)" }}>
       <button onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50 transition-colors text-left">
+        className="w-full flex items-center justify-between px-5 py-4 transition-colors text-left hover:bg-black/5 dark:hover:bg-white/5"
+        style={{ background: "var(--card)" }}>
         <div className="flex items-center gap-3">
-          <span className="text-blue-600">{icon}</span>
-          <span className="text-sm font-semibold text-slate-800">{title}</span>
+          <span className="text-blue-500">{icon}</span>
+          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>{title}</span>
         </div>
-        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: "var(--muted)" }} />
       </button>
       {open && (
-        <div className="px-5 pb-5 pt-1 bg-white border-t border-slate-100 text-sm text-slate-600 space-y-3">
+        <div className="px-5 pb-5 pt-1 border-t text-sm space-y-3" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--muted)" }}>
           {children}
         </div>
       )}
@@ -1091,13 +1092,13 @@ function HelpTab({ baseUrl }: { baseUrl: string }) {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-4 flex items-center gap-3">
-        <div className="p-2 bg-blue-50 rounded-lg">
-          <BookOpen className="h-5 w-5 text-blue-600" />
+      <div className="rounded-xl shadow-sm border px-6 py-4 flex items-center gap-3" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <div className="p-2 bg-blue-600/10 rounded-lg border border-blue-600/20">
+          <BookOpen className="h-5 w-5 text-blue-500" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-slate-800">Integration Guides</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Step-by-step setup instructions for each identity provider type.</p>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>Integration Guides</h2>
+          <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Step-by-step setup instructions for each identity provider type.</p>
         </div>
       </div>
 
@@ -1494,17 +1495,17 @@ export default function AuthenticationSettingsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-50 rounded-lg">
-            <ShieldCheck className="h-6 w-6 text-blue-600" />
+          <div className="p-2.5 bg-blue-600/10 rounded-xl border border-blue-600/20">
+            <ShieldCheck className="h-6 w-6 text-blue-500" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Authentication Settings</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Control login methods, identity providers, and group role mappings.</p>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>Authentication Settings</h1>
+            <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>Manage identity providers and enterprise authentication configuration.</p>
           </div>
         </div>
         {activeTab === "methods" && (
           <button onClick={handleSaveSettings} disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? "Saving…" : "Save Settings"}
           </button>
@@ -1515,7 +1516,7 @@ export default function AuthenticationSettingsPage() {
       {success && <div className="bg-green-50 border border-green-200 text-green-700 text-sm p-3 rounded-lg">{success}</div>}
 
       {/* Tab bar */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
         {([
           { key: "methods",   label: "Login Methods",      icon: ShieldCheck },
           { key: "providers", label: "Identity Providers", icon: Eye },
@@ -1523,11 +1524,12 @@ export default function AuthenticationSettingsPage() {
           { key: "help",      label: "Help",               icon: HelpCircle },
         ] as { key: ActiveTab; label: string; icon: (props: { className?: string }) => JSX.Element }[]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-150 ${
               activeTab === key
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}>
+                ? "border-blue-500 text-blue-500"
+                : "border-transparent hover:border-slate-300"
+            }`}
+            style={activeTab !== key ? { color: "var(--muted)" } : undefined}>
             <Icon className="h-4 w-4" />
             {label}
           </button>
@@ -1537,68 +1539,61 @@ export default function AuthenticationSettingsPage() {
       {/* ── Tab: Login Methods ─────────────────────────────────────────── */}
       {activeTab === "methods" && (
         <>
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Login Methods</h2>
-              <p className="text-xs text-slate-500 mt-0.5">At least one method must remain enabled.</p>
+          <div className="rounded-xl shadow-sm border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Login Methods</h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>At least one method must remain enabled.</p>
             </div>
             <div className="px-6 py-2">
-              <Toggle label="Enable Local Login"                description="Email + password stored in this system."                              checked={settings.allow_local_login}  onChange={set("allow_local_login")} />
-              <Toggle label="Enable Azure AD / Entra ID Login" description="Microsoft Azure Active Directory via OAuth 2.0 / OIDC."               checked={settings.allow_azure_login}  onChange={set("allow_azure_login")} />
-              <Toggle label="Enable Google Workspace Login"    description="Coming soon — Google Workspace OAuth 2.0."                            checked={settings.allow_google_login} onChange={set("allow_google_login")} />
-              <Toggle label="Enable LDAP / AD Login"           description="On-premise Active Directory or LDAP directory server."               checked={settings.allow_ldap_login}   onChange={set("allow_ldap_login")} />
-              <Toggle label="Enable SAML Login"                description="SAML 2.0 enterprise SSO — Okta, Auth0, Keycloak, and other IdPs."  checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
-              <Toggle label="Enable OIDC Login"                description="Generic OpenID Connect SSO — Okta, Auth0, Google Workspace, and more." checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
+              <Toggle label="Enable Local Login"                description="Email + password stored in this system."                                 checked={settings.allow_local_login}  onChange={set("allow_local_login")} />
+              <Toggle label="Enable Azure AD / Entra ID Login" description="Microsoft Azure Active Directory via OAuth 2.0 / OIDC."                  checked={settings.allow_azure_login}  onChange={set("allow_azure_login")} />
+              <Toggle label="Enable Google Workspace Login"    description="Coming soon — Google Workspace OAuth 2.0."                               checked={settings.allow_google_login} onChange={set("allow_google_login")} />
+              <Toggle label="Enable LDAP / AD Login"           description="On-premise Active Directory or LDAP directory server."                  checked={settings.allow_ldap_login}   onChange={set("allow_ldap_login")} />
+              <Toggle label="Enable SAML Login"                description="SAML 2.0 enterprise SSO — Okta, Auth0, Keycloak, and other IdPs."      checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
+              <Toggle label="Enable OIDC Login"                description="Generic OpenID Connect SSO — Okta, Auth0, Google Workspace, and more."  checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">User Sync Options</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Automatic provisioning and de-provisioning.</p>
+          <div className="rounded-xl shadow-sm border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>User Sync Options</h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Automatic provisioning and de-provisioning.</p>
             </div>
             <div className="px-6 py-2">
-              <Toggle label="Auto Import External Users"   description="Automatically create accounts for verified external users on first login." checked={settings.auto_import_external_users} onChange={set("auto_import_external_users")} />
-              <Toggle label="Auto Disable Removed Users"   description="Automatically disable users removed from the external identity provider."   checked={settings.auto_disable_removed_users} onChange={set("auto_disable_removed_users")} />
+              <Toggle label="Auto Import External Users" description="Automatically create accounts for verified external users on first login." checked={settings.auto_import_external_users} onChange={set("auto_import_external_users")} />
+              <Toggle label="Auto Disable Removed Users" description="Automatically disable users removed from the external identity provider."   checked={settings.auto_disable_removed_users} onChange={set("auto_disable_removed_users")} />
             </div>
           </div>
 
-          {/* Setup guides */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-amber-800 mb-3">Azure AD App Registration Setup</h3>
-            <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
-              <li>Go to <strong>Azure Portal → Azure Active Directory → App registrations → New registration</strong></li>
-              <li>Set a name, select supported account types (single or multi-tenant)</li>
-              <li>Add a <strong>Redirect URI</strong> (Web): <code className="bg-amber-100 px-1 rounded">{baseUrl || "https://your-domain"}/api/auth/azure/callback</code></li>
-              <li>Copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong></li>
-              <li>Go to <strong>Certificates &amp; secrets → New client secret</strong>, copy the secret <em>value</em></li>
-              <li>Go to <strong>API permissions → Microsoft Graph → Delegated</strong>: add <code className="bg-amber-100 px-1 rounded">openid profile email User.Read</code></li>
-              <li>For user/group sync, also add <strong>Application permissions</strong>: <code className="bg-amber-100 px-1 rounded">User.Read.All</code>, <code className="bg-amber-100 px-1 rounded">Group.Read.All</code></li>
-              <li>Click <strong>Grant admin consent</strong></li>
-            </ol>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-slate-800 mb-3">LDAP / Active Directory Setup</h3>
-            <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside">
-              <li>Create a <strong>service account</strong> in your directory with read-only access to users and groups</li>
-              <li>Note the service account&apos;s <strong>Distinguished Name (DN)</strong> and password</li>
-              <li>Find your directory&apos;s <strong>Base DN</strong> (e.g. <code className="bg-slate-100 px-1 rounded">DC=example,DC=com</code>)</li>
-              <li>Add an <strong>LDAP provider</strong> in the Identity Providers tab</li>
-              <li>Enable <strong>LDAP / AD Login</strong> above and save</li>
-              <li>Use <strong>Import Users</strong> in the Group Mapping tab to pull directory users</li>
-            </ol>
+          {/* Info card pointing to Help tab */}
+          <div className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 p-6 flex items-start gap-4">
+            <div className="p-2.5 bg-blue-600/10 rounded-xl border border-blue-600/20 shrink-0">
+              <HelpCircle className="h-5 w-5 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">Setup Instructions</h3>
+              <p className="text-sm text-blue-600 dark:text-blue-500">
+                Step-by-step configuration guides for Azure AD, Google Workspace, LDAP, SAML, and OIDC are available in the{" "}
+                <button
+                  onClick={() => setActiveTab("help")}
+                  className="font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity"
+                >
+                  Help tab
+                </button>
+                .
+              </p>
+            </div>
           </div>
         </>
       )}
 
       {/* ── Tab: Identity Providers ────────────────────────────────────── */}
       {activeTab === "providers" && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="rounded-xl shadow-sm border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Identity Providers</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Configured external authentication providers.</p>
+              <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Identity Providers</h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Configured external authentication providers.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => { setEditLdapProvider(null); setShowLdapModal(true); }}
@@ -1622,26 +1617,26 @@ export default function AuthenticationSettingsPage() {
 
           {providers.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <ShieldCheck className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-500">No identity providers configured</p>
-              <p className="text-xs text-slate-400 mt-1">Add Azure AD or LDAP to enable external authentication.</p>
+              <ShieldCheck className="h-10 w-10 mx-auto mb-3" style={{ color: "var(--border)" }} />
+              <p className="text-sm font-medium" style={{ color: "var(--muted)" }}>No identity providers configured</p>
+              <p className="text-xs mt-1" style={{ color: "var(--muted)", opacity: 0.7 }}>Add Azure AD or LDAP to enable external authentication.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50">
+              <table className="min-w-full divide-y" style={{ borderColor: "var(--border)" }}>
+                <thead style={{ background: "var(--bg)" }}>
                   <tr>
                     {["Name", "Provider", "Details", "Status", "Created", "Actions"].map((h) => (
-                      <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      <th key={h} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {providers.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 text-sm font-medium text-slate-800">{p.name}</td>
-                      <td className="px-6 py-4 text-sm text-slate-600">{PROVIDER_LABEL[p.provider_type] ?? p.provider_type}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 font-mono">
+                    <tr key={p.id} className="transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                      <td className="px-6 py-4 text-sm font-medium" style={{ color: "var(--text)" }}>{p.name}</td>
+                      <td className="px-6 py-4 text-sm" style={{ color: "var(--muted)" }}>{PROVIDER_LABEL[p.provider_type] ?? p.provider_type}</td>
+                      <td className="px-6 py-4 text-sm font-mono" style={{ color: "var(--muted)" }}>
                         {p.provider_type === "LDAP"
                           ? (p.ldap_url ? p.ldap_url.replace(/^ldaps?:\/\//, "").split(":")[0].slice(0, 24) : "—")
                           : p.provider_type === "SAML"
@@ -1679,14 +1674,15 @@ export default function AuthenticationSettingsPage() {
       {activeTab === "groups" && (
         <div className="space-y-6">
           {/* Provider selector + sync actions */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="rounded-xl shadow-sm border p-5" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Identity Provider</label>
+                <label className="block text-sm font-medium mb-1" style={{ color: "var(--text)" }}>Identity Provider</label>
                 <select
                   value={selectedProvider}
                   onChange={(e) => setSelectedProvider(e.target.value)}
-                  className="block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  className="block w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}
                 >
                   <option value="">Select provider…</option>
                   {externalProviders.map((p) => (
@@ -1771,11 +1767,11 @@ export default function AuthenticationSettingsPage() {
           </div>
 
           {/* Group Mappings table */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="rounded-xl shadow-sm border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Group → Role Mappings</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Map directory groups to application roles. Roles are assigned automatically on login.</p>
+                <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Group → Role Mappings</h2>
+                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Map directory groups to application roles. Roles are assigned automatically on login.</p>
               </div>
               <button onClick={() => { setEditMapping(null); setShowMappingModal(true); }}
                 className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
@@ -1785,28 +1781,28 @@ export default function AuthenticationSettingsPage() {
 
             {mappings.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <GitMerge className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-500">No group mappings configured</p>
-                <p className="text-xs text-slate-400 mt-1">Add a mapping to automatically assign roles based on group membership.</p>
+                <GitMerge className="h-10 w-10 mx-auto mb-3" style={{ color: "var(--border)" }} />
+                <p className="text-sm font-medium" style={{ color: "var(--muted)" }}>No group mappings configured</p>
+                <p className="text-xs mt-1" style={{ color: "var(--muted)", opacity: 0.7 }}>Add a mapping to automatically assign roles based on group membership.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100">
-                  <thead className="bg-slate-50">
+                <table className="min-w-full divide-y" style={{ borderColor: "var(--border)" }}>
+                  <thead style={{ background: "var(--bg)" }}>
                     <tr>
                       {["Group Name", "Group ID / DN", "Provider", "App Role", "Auto Assign", "Status", "Actions"].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
                     {mappings.map((m) => (
-                      <tr key={m.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-sm font-medium text-slate-800">{m.external_group_name}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500 font-mono max-w-[160px] truncate" title={m.external_group_id}>
+                      <tr key={m.id} className="transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                        <td className="px-4 py-3 text-sm font-medium" style={{ color: "var(--text)" }}>{m.external_group_name}</td>
+                        <td className="px-4 py-3 text-xs font-mono max-w-[160px] truncate" style={{ color: "var(--muted)" }} title={m.external_group_id}>
                           {m.external_group_id.length > 20 ? `${m.external_group_id.slice(0, 20)}…` : m.external_group_id}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-500">{m.identity_provider.name}</td>
+                        <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{m.identity_provider.name}</td>
                         <td className="px-4 py-3">
                           {m.app_role ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
