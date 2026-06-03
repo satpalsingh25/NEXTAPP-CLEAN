@@ -1,0 +1,294 @@
+Update the existing Authentication Settings page in NEXTAPP-CLEAN.
+
+DO NOT change any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Create a completely separate tab:
+
+[ Help ]
+
+inside:
+Admin
+ └── Authentication Settings
+
+Current tabs/settings must remain unchanged.
+
+====================================================
+REQUIREMENTS
+====================================================
+
+Add top-level tabs:
+
+- Login Methods
+- Identity Providers
+- Group Mapping
+- Help   ← NEW TAB
+
+The new Help tab should contain:
+- Azure AD / Entra ID guide
+- Google Workspace guide
+- LDAP / Active Directory guide
+- SAML 2.0 guide
+- OIDC / OpenID Connect guide
+
+====================================================
+HELP TAB UI
+====================================================
+
+Inside Help tab:
+
+Use:
+- Accordion OR nested tabs
+OR cards with expand/collapse
+
+Sections:
+
+1. Azure AD / Entra ID
+2. Google Workspace
+3. LDAP / Active Directory
+4. SAML 2.0
+5. OIDC / OpenID Connect
+
+Must match existing UI/theme.
+
+====================================================
+1. AZURE AD GUIDE
+====================================================
+
+Title:
+Azure AD App Registration Setup
+
+Show steps:
+
+1. Go to:
+Azure Portal → Azure Active Directory → App registrations → New registration
+
+2. Set:
+- App name
+- Supported account types
+- Redirect URI
+
+3. Redirect URI:
+
+https://YOUR_DOMAIN/api/auth/azure/callback
+
+4. Copy:
+- Application (client) ID
+- Directory (tenant) ID
+
+5. Go to:
+Certificates & secrets → New client secret
+
+6. Copy secret value
+
+7. Add Microsoft Graph delegated permissions:
+- openid
+- profile
+- email
+- User.Read
+
+8. For sync also add application permissions:
+- User.Read.All
+- Group.Read.All
+
+9. Click:
+Grant admin consent
+
+====================================================
+2. GOOGLE WORKSPACE GUIDE
+====================================================
+
+Title:
+Google Workspace / Google Login Setup
+
+Explain:
+Google authentication works through OIDC Provider.
+
+Steps:
+
+1. Open:
+Google Cloud Console
+
+2. Create:
+New Project
+
+3. Enable:
+OAuth APIs / Google Identity Services
+
+4. Configure:
+OAuth Consent Screen
+
+5. Create:
+OAuth 2.0 Client ID
+
+Application Type:
+Web Application
+
+6. Add Redirect URI:
+
+https://YOUR_DOMAIN/api/auth/oidc/callback
+
+7. Copy:
+- Client ID
+- Client Secret
+
+8. Add OIDC Provider in NEXTAPP-CLEAN
+
+9. Use:
+
+Issuer URL:
+https://accounts.google.com
+
+Discovery URL:
+https://accounts.google.com/.well-known/openid-configuration
+
+Scopes:
+openid profile email
+
+====================================================
+3. LDAP / ACTIVE DIRECTORY GUIDE
+====================================================
+
+Title:
+LDAP / Active Directory Setup
+
+Steps:
+
+1. Create:
+Read-only service account
+
+2. Collect:
+- Bind DN
+- Password
+- Base DN
+
+Example:
+DC=example,DC=com
+
+3. Add LDAP Provider
+
+4. Fill:
+- LDAP URL
+- Bind DN
+- Password
+- Base DN
+- User Filter
+- Group Filter
+
+5. Enable:
+LDAP Login
+
+6. Use:
+Import Users
+
+====================================================
+4. SAML GUIDE
+====================================================
+
+Title:
+SAML 2.0 Setup
+
+Supported:
+- Okta
+- Keycloak
+- OneLogin
+- Ping Identity
+- Google Workspace
+
+Steps:
+
+1. Create SAML App
+
+2. Configure:
+
+ACS URL:
+https://YOUR_DOMAIN/api/auth/saml/callback
+
+Entity ID:
+NEXTAPP-CLEAN
+
+3. Copy:
+- Entry Point URL
+- Issuer
+- Certificate
+
+4. Add SAML Provider
+
+5. Enable:
+SAML Login
+
+====================================================
+5. OIDC GUIDE
+====================================================
+
+Title:
+OIDC / OpenID Connect Setup
+
+Supported:
+- Auth0
+- Okta
+- Keycloak
+- Google
+- OneLogin
+
+Steps:
+
+1. Create OIDC Application
+
+2. Add callback URL:
+
+https://YOUR_DOMAIN/api/auth/oidc/callback
+
+3. Copy:
+- Issuer URL
+- Discovery URL
+- Client ID
+- Client Secret
+
+4. Add OIDC Provider
+
+5. Enable:
+OIDC Login
+
+====================================================
+ADDITIONAL REQUIREMENTS
+====================================================
+
+- Use syntax/code blocks for URLs
+- Add copy button for URLs if possible
+- Dynamically detect current app URL if possible
+- Dark/light mode compatible
+- Mobile responsive
+- Use existing UI components
+
+====================================================
+IMPORTANT
+====================================================
+
+- Do NOT modify auth logic
+- Do NOT modify provider logic
+- Do NOT break existing tabs
+- Do NOT remove existing functionality
+
+====================================================
+FINAL VALIDATION
+====================================================
+
+- No TS errors
+- Existing auth works
+- Existing tabs work
+- Help tab responsive
+- Theme compatibility works
+- App boots cleanly
+
+====================================================
+OUTPUT
+====================================================
+
+Provide:
+- Files updated
+- Components added
+- UI summary

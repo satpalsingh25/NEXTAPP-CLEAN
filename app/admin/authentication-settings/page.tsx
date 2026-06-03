@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   ShieldCheck, RefreshCw, Save, Eye, Pencil, Ban,
   CheckCircle, XCircle, Plus, X, Loader2, Users, GitMerge,
+  HelpCircle, ChevronDown, Copy, Check, BookOpen,
   Download, RotateCcw, Server,
 } from "lucide-react";
 
@@ -1023,8 +1024,266 @@ function GroupMappingModal({
   );
 }
 
+/* ── Help Tab ───────────────────────────────────────────────────────── */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+  return (
+    <button onClick={handleCopy} title="Copy to clipboard"
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 transition-colors shrink-0">
+      {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+function CodeBlock({ value }: { value: string }) {
+  return (
+    <div className="flex items-center gap-2 mt-1 bg-slate-100 rounded-md px-3 py-1.5 text-xs font-mono text-slate-700 break-all">
+      <span className="flex-1">{value}</span>
+      <CopyButton text={value} />
+    </div>
+  );
+}
+
+function AccordionItem({
+  title, icon, children, defaultOpen = false,
+}: {
+  title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50 transition-colors text-left">
+        <div className="flex items-center gap-3">
+          <span className="text-blue-600">{icon}</span>
+          <span className="text-sm font-semibold text-slate-800">{title}</span>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-1 bg-white border-t border-slate-100 text-sm text-slate-600 space-y-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <div className="flex-1 leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+function HelpTab({ baseUrl }: { baseUrl: string }) {
+  const domain = baseUrl || "https://your-domain.com";
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-4 flex items-center gap-3">
+        <div className="p-2 bg-blue-50 rounded-lg">
+          <BookOpen className="h-5 w-5 text-blue-600" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Integration Guides</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Step-by-step setup instructions for each identity provider type.</p>
+        </div>
+      </div>
+
+      {/* Azure AD */}
+      <AccordionItem defaultOpen title="Azure AD / Entra ID" icon={
+        <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1"  y="1"  width="9" height="9" fill="#f25022" />
+          <rect x="11" y="1"  width="9" height="9" fill="#7fba00" />
+          <rect x="1"  y="11" width="9" height="9" fill="#00a4ef" />
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+        </svg>
+      }>
+        <p className="font-medium text-slate-700">Azure AD App Registration Setup</p>
+        <div className="space-y-3 mt-2">
+          <Step n={1}><span>Go to <strong>Azure Portal → Azure Active Directory → App registrations → New registration</strong></span></Step>
+          <Step n={2}><span>Set a name, select supported account types (single-tenant or multi-tenant)</span></Step>
+          <Step n={3}>
+            <div>
+              <span>Add a <strong>Redirect URI</strong> (Web):</span>
+              <CodeBlock value={`${domain}/api/auth/azure/callback`} />
+            </div>
+          </Step>
+          <Step n={4}><span>Copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong></span></Step>
+          <Step n={5}><span>Go to <strong>Certificates &amp; secrets → New client secret</strong> — copy the <em>value</em> (not the ID)</span></Step>
+          <Step n={6}><span>Go to <strong>API permissions → Microsoft Graph → Delegated</strong> and add: <code className="bg-slate-100 px-1 rounded">openid</code>, <code className="bg-slate-100 px-1 rounded">profile</code>, <code className="bg-slate-100 px-1 rounded">email</code>, <code className="bg-slate-100 px-1 rounded">User.Read</code></span></Step>
+          <Step n={7}><span>For user/group sync also add <strong>Application permissions</strong>: <code className="bg-slate-100 px-1 rounded">User.Read.All</code>, <code className="bg-slate-100 px-1 rounded">Group.Read.All</code></span></Step>
+          <Step n={8}><span>Click <strong>Grant admin consent</strong></span></Step>
+          <Step n={9}><span>In the <strong>Identity Providers</strong> tab, click <strong>Add Azure AD</strong> and enter the Client ID, Tenant ID, and Client Secret</span></Step>
+        </div>
+      </AccordionItem>
+
+      {/* Google Workspace */}
+      <AccordionItem title="Google Workspace / Google Login" icon={
+        <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+      }>
+        <p className="font-medium text-slate-700">Google Workspace / Google Login Setup</p>
+        <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-2 text-xs text-sky-700 mt-1">
+          Google authentication is configured through an <strong>OIDC Provider</strong>. Follow the OIDC steps below using Google&apos;s values.
+        </div>
+        <div className="space-y-3 mt-2">
+          <Step n={1}><span>Open <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google Cloud Console</a> and create a new project</span></Step>
+          <Step n={2}><span>Navigate to <strong>APIs &amp; Services → OAuth consent screen</strong> and configure it (User Type: External or Internal)</span></Step>
+          <Step n={3}><span>Go to <strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong></span></Step>
+          <Step n={4}><span>Set Application Type to <strong>Web Application</strong> and add the Redirect URI:</span>
+            <CodeBlock value={`${domain}/api/auth/oidc/callback`} />
+          </Step>
+          <Step n={5}><span>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong></span></Step>
+          <Step n={6}>
+            <div>
+              <span>In the <strong>Identity Providers</strong> tab, click <strong>Add OIDC</strong> and enter:</span>
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-slate-500">Issuer URL:</div>
+                <CodeBlock value="https://accounts.google.com" />
+                <div className="text-xs text-slate-500 mt-1">Discovery URL:</div>
+                <CodeBlock value="https://accounts.google.com/.well-known/openid-configuration" />
+                <div className="text-xs text-slate-500 mt-1">Scopes:</div>
+                <CodeBlock value="openid profile email" />
+              </div>
+            </div>
+          </Step>
+          <Step n={7}><span>Enable <strong>OIDC Login</strong> in the Login Methods tab and save</span></Step>
+        </div>
+      </AccordionItem>
+
+      {/* LDAP */}
+      <AccordionItem title="LDAP / Active Directory" icon={<Server className="h-4.5 w-4.5" />}>
+        <p className="font-medium text-slate-700">LDAP / Active Directory Setup</p>
+        <div className="space-y-3 mt-2">
+          <Step n={1}><span>Create a <strong>read-only service account</strong> in your directory with permission to search users and groups</span></Step>
+          <Step n={2}>
+            <div>
+              <span>Collect the service account&apos;s <strong>Bind DN</strong> and <strong>password</strong>, plus your directory&apos;s <strong>Base DN</strong>. Example:</span>
+              <CodeBlock value="DC=example,DC=com" />
+            </div>
+          </Step>
+          <Step n={3}><span>In the <strong>Identity Providers</strong> tab, click <strong>Add LDAP</strong></span></Step>
+          <Step n={4}><span>Fill in the form:<br /><strong>LDAP URL</strong> — e.g. <code className="bg-slate-100 px-1 rounded">ldap://dc.example.com:389</code> or <code className="bg-slate-100 px-1 rounded">ldaps://dc.example.com:636</code><br /><strong>Bind DN</strong>, <strong>Password</strong>, <strong>Base DN</strong><br /><strong>User Filter</strong> (default: <code className="bg-slate-100 px-1 rounded">(objectClass=person)</code>)<br /><strong>Group Filter</strong> (default: <code className="bg-slate-100 px-1 rounded">(objectClass=group)</code>)</span></Step>
+          <Step n={5}><span>Enable <strong>LDAP / AD Login</strong> in the Login Methods tab and save</span></Step>
+          <Step n={6}><span>Use <strong>Import Users</strong> in the Group Mapping tab to pull directory users into the app</span></Step>
+        </div>
+      </AccordionItem>
+
+      {/* SAML */}
+      <AccordionItem title="SAML 2.0" icon={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round"/>
+          <circle cx="12" cy="12" r="3" fill="#6366f1"/>
+        </svg>
+      }>
+        <p className="font-medium text-slate-700">SAML 2.0 Setup</p>
+        <div className="flex flex-wrap gap-1.5 mt-1 mb-3">
+          {["Okta", "Keycloak", "OneLogin", "Ping Identity", "Google Workspace"].map((idp) => (
+            <span key={idp} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-100">{idp}</span>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <Step n={1}><span>In your IdP, create a new <strong>SAML 2.0 Application</strong></span></Step>
+          <Step n={2}>
+            <div>
+              <span>Configure the SP settings in your IdP:</span>
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-slate-500">ACS URL (Assertion Consumer Service):</div>
+                <CodeBlock value={`${domain}/api/auth/saml/callback`} />
+                <div className="text-xs text-slate-500 mt-1">SP Entity ID / Audience — use the same value as your Issuer field in the SAML provider form (e.g. your app URL):</div>
+                <CodeBlock value={domain} />
+                <div className="text-xs text-slate-500 mt-1">Name ID format:</div>
+                <CodeBlock value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" />
+              </div>
+            </div>
+          </Step>
+          <Step n={3}><span>Map the <strong>email</strong> attribute in your IdP SAML app (most IdPs do this by default)</span></Step>
+          <Step n={4}><span>Copy from your IdP: <strong>Entry Point URL</strong>, <strong>Issuer / Entity ID</strong>, and the <strong>X.509 Certificate</strong></span></Step>
+          <Step n={5}><span>In the <strong>Identity Providers</strong> tab, click <strong>Add SAML</strong> and enter the values</span></Step>
+          <Step n={6}><span>Enable <strong>SAML Login</strong> in the Login Methods tab and save</span></Step>
+          <Step n={7}><span>Click <strong>Test Connection</strong> to verify the entry point is reachable before going live</span></Step>
+        </div>
+      </AccordionItem>
+
+      {/* OIDC */}
+      <AccordionItem title="OIDC / OpenID Connect" icon={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="#0ea5e9" strokeWidth="2"/>
+          <path d="M12 8v4l3 3" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      }>
+        <p className="font-medium text-slate-700">OIDC / OpenID Connect Setup</p>
+        <div className="flex flex-wrap gap-1.5 mt-1 mb-3">
+          {["Auth0", "Okta", "Keycloak", "Google", "OneLogin", "Azure AD B2C"].map((idp) => (
+            <span key={idp} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sky-50 text-sky-700 border border-sky-100">{idp}</span>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <Step n={1}><span>In your IdP, create a new <strong>OIDC Application</strong> (Application Type: Web / Regular Web App)</span></Step>
+          <Step n={2}>
+            <div>
+              <span>Add the callback URL (Allowed Redirect URI / Login URL):</span>
+              <CodeBlock value={`${domain}/api/auth/oidc/callback`} />
+            </div>
+          </Step>
+          <Step n={3}><span>Set the Grant Type to <strong>Authorization Code</strong></span></Step>
+          <Step n={4}><span>Copy from your IdP: <strong>Issuer URL</strong> (or Discovery URL), <strong>Client ID</strong>, <strong>Client Secret</strong></span></Step>
+          <Step n={5}><span>In the <strong>Identity Providers</strong> tab, click <strong>Add OIDC</strong> and fill in the form. The Issuer URL is used to auto-discover <code className="bg-slate-100 px-1 rounded">/.well-known/openid-configuration</code></span></Step>
+          <Step n={6}><span>Click <strong>Fetch Discovery</strong> to verify the IdP is reachable and the config is correct</span></Step>
+          <Step n={7}><span>Enable <strong>OIDC Login</strong> in the Login Methods tab and save</span></Step>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3 text-xs text-amber-700 space-y-1">
+          <p className="font-semibold text-amber-800">Common IdP discovery URLs</p>
+          <div className="space-y-1.5 mt-1">
+            {[
+              ["Auth0",     "https://YOUR-DOMAIN.auth0.com"],
+              ["Okta",      "https://YOUR-DOMAIN.okta.com"],
+              ["Google",    "https://accounts.google.com"],
+              ["Keycloak",  "https://YOUR-HOST/realms/YOUR-REALM"],
+              ["Azure B2C", "https://YOUR-TENANT.b2clogin.com/YOUR-TENANT.onmicrosoft.com/v2.0"],
+            ].map(([name, url]) => (
+              <div key={name} className="flex items-center gap-2">
+                <span className="w-16 shrink-0 font-medium">{name}:</span>
+                <div className="flex items-center gap-1.5 bg-amber-100 rounded px-2 py-0.5 flex-1 min-w-0">
+                  <code className="text-amber-800 text-xs truncate flex-1">{url}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </AccordionItem>
+
+      {/* Footer note */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-500 flex items-start gap-2">
+        <HelpCircle className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+        <p>
+          Your app URL detected as: <strong className="text-slate-700">{domain}</strong>.
+          All callback and redirect URIs above use this base URL automatically.
+          If your production domain differs, update the URIs in your IdP accordingly.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ──────────────────────────────────────────────────────── */
-type ActiveTab = "methods" | "providers" | "groups";
+type ActiveTab = "methods" | "providers" | "groups" | "help";
 
 export default function AuthenticationSettingsPage() {
   const [activeTab,    setActiveTab]    = useState<ActiveTab>("methods");
@@ -1261,6 +1520,7 @@ export default function AuthenticationSettingsPage() {
           { key: "methods",   label: "Login Methods",      icon: ShieldCheck },
           { key: "providers", label: "Identity Providers", icon: Eye },
           { key: "groups",    label: "Group Mapping",      icon: GitMerge },
+          { key: "help",      label: "Help",               icon: HelpCircle },
         ] as { key: ActiveTab; label: string; icon: (props: { className?: string }) => JSX.Element }[]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -1414,6 +1674,8 @@ export default function AuthenticationSettingsPage() {
       )}
 
       {/* ── Tab: Group Mapping ─────────────────────────────────────────── */}
+      {activeTab === "help" && <HelpTab baseUrl={baseUrl} />}
+
       {activeTab === "groups" && (
         <div className="space-y-6">
           {/* Provider selector + sync actions */}
