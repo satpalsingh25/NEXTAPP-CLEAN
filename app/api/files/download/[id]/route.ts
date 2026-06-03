@@ -97,8 +97,11 @@ export async function GET(
   }
 
   /* 5. Fetch file content from Microsoft Graph API ------------------ */
-  const graphUrl =
-    `https://graph.microsoft.com/v1.0/drives/${drive_id}/root:/${folderPath}/${encodeURIComponent(filename)}:/content`;
+  /*    Fast path: use itemId if available (skips path lookup).       */
+  /*    Fallback: reconstruct URL from stored file_path (legacy).     */
+  const graphUrl = doc.external_file_id
+    ? `https://graph.microsoft.com/v1.0/drives/${drive_id}/items/${doc.external_file_id}/content`
+    : `https://graph.microsoft.com/v1.0/drives/${drive_id}/root:/${folderPath}/${encodeURIComponent(filename)}:/content`;
 
   let spRes: Response;
   try {

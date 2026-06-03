@@ -1,0 +1,318 @@
+# 🚀 Phase 12 — Step 2
+
+# SharePoint Provider Refactor (Unified Storage Adapter)
+
+## Replit Optimized Prompt
+
+```text id="p12step2prompt"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 12 Step 1 → Multi-Storage Provider Foundation
+
+Current state:
+- Existing SharePoint integration already works
+- DMS uploads work
+- Compliance uploads work
+- AMC uploads work
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Refactor existing SharePoint integration into the new unified storage architecture.
+
+This step converts SharePoint into:
+
+SharePointStorageProvider
+
+using the new:
+StorageProviderInterface
+
+Requirements:
+- Existing uploads must continue working
+- Existing files must remain accessible
+- Existing folder structure must remain untouched
+- No migration of existing files
+
+====================================================
+1. IMPLEMENT SHAREPOINT STORAGE PROVIDER
+====================================================
+
+Implement:
+
+/lib/storage/providers/sharepoint-provider.ts
+
+Must implement:
+
+StorageProviderInterface
+
+====================================================
+2. IMPLEMENT REQUIRED METHODS
+====================================================
+
+Implement methods:
+
+- uploadFile()
+- downloadFile()
+- deleteFile()
+- createFolder()
+- renameFile()
+- renameFolder()
+- generatePreviewUrl()
+- generateDownloadUrl()
+- testConnection()
+
+Use existing SharePoint logic internally.
+
+====================================================
+3. REUSE EXISTING SHAREPOINT SERVICES
+====================================================
+
+DO NOT duplicate logic.
+
+Reuse:
+- existing Graph API logic
+- existing SharePoint upload logic
+- existing token handling
+- existing folder logic
+
+Refactor cleanly.
+
+====================================================
+4. STORAGE SERVICE INTEGRATION
+====================================================
+
+Update:
+
+/lib/storage/storage-service.ts
+
+Requirements:
+- Resolve company provider
+- Load provider instance
+- Route calls through provider interface
+
+====================================================
+5. SHAREPOINT PROVIDER RESOLUTION
+====================================================
+
+Implement helper:
+
+resolveSharePointProvider(companyId)
+
+Rules:
+- find default provider
+- validate ownership
+- validate enabled state
+
+====================================================
+6. DOCUMENT STORAGE MAPPING
+====================================================
+
+When uploading:
+
+Update Document table:
+- storage_provider_id
+- external_file_id
+- external_path
+
+Preserve existing data.
+
+====================================================
+7. REFACTOR DMS UPLOADS
+====================================================
+
+Update DMS uploads to use:
+
+storage-service.ts
+
+instead of direct SharePoint calls.
+
+Requirements:
+- Preserve existing folder structure
+- Preserve naming conventions
+- Preserve previews
+- Preserve drag/drop uploads
+
+====================================================
+8. REFACTOR COMPLIANCE UPLOADS
+====================================================
+
+Update Compliance uploads to use:
+
+storage-service.ts
+
+Requirements:
+- Existing upload flow unchanged
+- Existing approvals unaffected
+- Existing links preserved
+
+====================================================
+9. REFACTOR AMC UPLOADS
+====================================================
+
+Update AMC uploads to use:
+
+storage-service.ts
+
+Requirements:
+- Existing upload flow unchanged
+- Existing folder structure preserved
+
+====================================================
+10. PREVIEW & DOWNLOAD SUPPORT
+====================================================
+
+All previews/downloads must now route through:
+
+storage-service.ts
+
+Requirements:
+- Existing preview UI works
+- Existing inline PDF/image preview works
+- Existing download buttons work
+
+====================================================
+11. TEST CONNECTION FEATURE
+====================================================
+
+Implement:
+
+testConnection()
+
+Validate:
+- Graph connectivity
+- Site accessibility
+- Folder access
+- Permissions
+
+Show:
+- success/failure status
+
+====================================================
+12. PROVIDER SETTINGS UI
+====================================================
+
+Enhance SharePoint provider edit modal.
+
+Add fields:
+
+- Tenant ID
+- Client ID
+- Client Secret
+- Site ID
+- Drive ID
+- Root Folder
+
+Requirements:
+- secure secret handling
+- masked secrets
+- validation
+
+====================================================
+13. EXISTING CONFIG MIGRATION
+====================================================
+
+If old SharePoint config exists:
+
+Auto-create:
+StorageProvider entry
+
+Type:
+SHAREPOINT
+
+Requirements:
+- preserve current functionality
+- no manual migration needed
+
+====================================================
+14. BACKWARD COMPATIBILITY
+====================================================
+
+VERY IMPORTANT.
+
+Existing files/documents MUST:
+- continue opening
+- continue previewing
+- continue downloading
+
+No broken links.
+
+====================================================
+15. AUDIT LOGGING
+====================================================
+
+Log:
+- provider updates
+- upload actions
+- delete actions
+- rename actions
+- connection tests
+
+Use existing audit system.
+
+====================================================
+16. SECURITY REQUIREMENTS
+====================================================
+
+Validate:
+- company ownership
+- provider ownership
+- secure token handling
+- permission checks
+
+Prevent:
+- cross-company file access
+- provider leakage
+
+====================================================
+17. PERFORMANCE REQUIREMENTS
+====================================================
+
+Requirements:
+- avoid duplicate token requests
+- optimize Graph calls
+- maintain current performance
+- support future scaling
+
+====================================================
+18. IMPORTANT RULES
+====================================================
+
+- DO NOT break existing uploads
+- DO NOT move existing files
+- DO NOT recreate folder structures
+- DO NOT change SharePoint paths
+- DO NOT implement Google Drive yet
+- DO NOT implement AWS S3 yet
+- DO NOT implement Azure Blob yet
+
+====================================================
+19. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Existing DMS uploads work
+- Existing Compliance uploads work
+- Existing AMC uploads work
+- Existing previews work
+- Existing downloads work
+- Existing SharePoint data visible
+- No TS errors
+- App boots cleanly
+
+====================================================
+20. OUTPUT
+====================================================
+
+At completion provide:
+- Files updated
+- Refactored services
+- Upload flow summary
+- SharePoint provider summary
+- Backward compatibility notes
+- Any manual validation steps
+```

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma }             from "@/lib/prisma";
 import { requireAuth }        from "@/lib/auth.server";
 import { validateUpload }     from "@/lib/dms-validation";
-import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
+import { uploadDmsFile } from "@/lib/storage/storage-service";
 import { checkFolderAccess }  from "@/lib/dms-permission";
 import { logDmsActivity }     from "@/lib/dms-activity";
 import { gateModule }         from "@/lib/module-access";
@@ -99,21 +99,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  /* 5. Resolve drive ID + access token (parallel) ------------------- */
-  let drive_id:    string;
-  let accessToken: string;
-  try {
-    [drive_id, accessToken] = await Promise.all([
-      getDriveId(company_id),
-      getSharePointToken(company_id),
-    ]);
-  } catch (e: unknown) {
-    const requestId = generateRequestId();
-    logInternalError(e, { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId });
-    return errorResponse(SP_ERRORS.CONFIG, 502, requestId);
-  }
-
-  /* 6. Upload each file to SharePoint & save metadata --------------- */
+  /* 5. Upload each file via storage service & save metadata --------- */
   const uploaded: {
     id:          string;
     name:        string;
@@ -125,56 +111,39 @@ export async function POST(req: NextRequest) {
   const folderPath = folder.path.replace(/^\/+|\/+$/g, "");
 
   for (const file of rawFiles) {
-    const filename  = file.name;
-    const uploadUrl =
-      `https://graph.microsoft.com/v1.0/drives/${drive_id}/root:/${folderPath}/${filename}:/content`;
+    const filename = file.name;
 
-    let fileUrl:  string;
-    let spItemId: string | null = null;
+    let uploadResult: { fileId: string; webUrl: string; driveId: string; filePath: string };
     try {
-      const arrayBuffer = await file.arrayBuffer();
-
-      const uploadRes = await fetch(uploadUrl, {
-        method:  "PUT",
-        headers: {
-          Authorization:  `Bearer ${accessToken}`,
-          "Content-Type": "application/octet-stream",
-        },
-        body: arrayBuffer,
+      uploadResult = await uploadDmsFile({
+        companyId:  company_id,
+        folderPath,
+        fileName:   filename,
+        file,
       });
-
-      if (!uploadRes.ok) {
-        const errJson = await uploadRes.json().catch(() => ({})) as { error?: { message?: string } };
-        const requestId = generateRequestId();
-        logInternalError(
-          new Error(`SharePoint upload failed for "${filename}": ${errJson?.error?.message ?? uploadRes.statusText}`),
-          { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId, meta: { filename, status: uploadRes.status } },
-        );
-        return errorResponse(SP_ERRORS.UPLOAD, 502, requestId);
-      }
-
-      const spFile = await uploadRes.json() as {
-        id?:     string;
-        webUrl?: string;
-      };
-      fileUrl  = spFile.webUrl ?? uploadUrl;
-      spItemId = spFile.id ?? null;
-
     } catch (e: unknown) {
       const requestId = generateRequestId();
-      logInternalError(e, { route: "POST /api/dms/upload", user_id, company_id, request_id: requestId, meta: { filename } });
-      return errorResponse(SP_ERRORS.UPLOAD, 502, requestId);
+      const msg = (e as Error).message ?? "";
+      const isCfg = msg.toLowerCase().includes("not configured") || msg.toLowerCase().includes("config");
+      logInternalError(e, {
+        route:      "POST /api/dms/upload",
+        user_id,
+        company_id,
+        request_id: requestId,
+        meta:       { filename },
+      });
+      return errorResponse(isCfg ? SP_ERRORS.CONFIG : SP_ERRORS.UPLOAD, 502, requestId);
     }
 
     const doc = await prisma.dmsDocument.create({
       data: {
         company_id,
         name:               filename,
-        file_url:           fileUrl,
+        file_url:           uploadResult.webUrl,
         folder_path:        folderPath,
         uploaded_by:        user_id,
-        sharepoint_item_id: spItemId,
-        drive_id,
+        sharepoint_item_id: uploadResult.fileId || null,
+        drive_id:           uploadResult.driveId,
       },
     });
 

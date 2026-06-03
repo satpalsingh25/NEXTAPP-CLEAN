@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma }                   from "@/lib/prisma";
 import { requireAuth }              from "@/lib/auth.server";
 import { uploadFile }               from "@/lib/storage";
+import { getSharePointProviderId }  from "@/lib/storage/storage-service";
 import { gateModule } from "@/lib/module-access";
 
 /* ------------------------------------------------------------------ */
@@ -55,7 +56,10 @@ export async function POST(
     return NextResponse.json({ error: "At least one file is required." }, { status: 400 });
   }
 
-  /* 3. Upload each file via storage service & persist metadata ----- */
+  /* 3. Resolve storage provider ID (auto-migrates from SharePointConfig) */
+  const storage_provider_id = await getSharePointProviderId(company_id).catch(() => null);
+
+  /* 4. Upload each file via storage service & persist metadata ----- */
   const uploaded: { id: string; file_path: string }[] = [];
 
   for (const file of files) {
@@ -84,6 +88,10 @@ export async function POST(
         record_id:   amc_id,
         file_path:   result.path,
         uploaded_by: user_id,
+        /* Unified storage provider fields */
+        ...(storage_provider_id               ? { storage_provider_id }                      : {}),
+        ...(result.sharePointItemId           ? { external_file_id: result.sharePointItemId } : {}),
+        external_path: result.path,
       },
       select: { id: true, file_path: true },
     });
@@ -91,6 +99,6 @@ export async function POST(
     uploaded.push(doc);
   }
 
-  /* 4. Done -------------------------------------------------------- */
+  /* 5. Done -------------------------------------------------------- */
   return NextResponse.json({ success: true, uploaded });
 }

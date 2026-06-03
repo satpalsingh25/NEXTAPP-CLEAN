@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   HardDrive, Plus, X, Loader2, CheckCircle, XCircle,
   Pencil, Ban, Eye, RefreshCw, Star, StarOff, Zap,
-  Cloud, Server, Database, Box,
+  Cloud, Server, Database, Box, ExternalLink, Info,
 } from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
@@ -199,7 +200,34 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
             <span className="text-sm text-slate-700">Set as default provider</span>
           </label>
 
-          {!IMPLEMENTED.has(providerType) && (
+          {/* SharePoint-specific: credentials live in SharePoint Settings */}
+          {providerType === "SHAREPOINT" && (
+            <div className="bg-[#0078d4]/5 border border-[#0078d4]/20 rounded-xl px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2 text-[#0078d4]">
+                <Info className="h-4 w-4 shrink-0" />
+                <p className="text-xs font-semibold">SharePoint Credentials</p>
+              </div>
+              <p className="text-xs text-slate-600">
+                Tenant ID, Client ID, Client Secret, Site URL, and Document Library are
+                managed in <strong>SharePoint Settings</strong> and are encrypted at rest.
+              </p>
+              {editProvider?.configuration_json &&
+                typeof editProvider.configuration_json === "object" &&
+                !!(editProvider.configuration_json as Record<string, unknown>).site_url_preview && (
+                  <p className="text-xs text-slate-500 font-mono truncate">
+                    Site: {String((editProvider.configuration_json as Record<string, unknown>).site_url_preview)}
+                  </p>
+              )}
+              <Link
+                href="/admin/sharepoint"
+                className="inline-flex items-center gap-1 text-xs text-[#0078d4] hover:underline font-medium"
+              >
+                Configure SharePoint Credentials <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+
+          {!IMPLEMENTED.has(providerType) && providerType !== "SHAREPOINT" && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
               <strong>{PROVIDER_META[providerType].label}</strong> is registered in the architecture but full
               configuration and uploads will be available in a future phase.

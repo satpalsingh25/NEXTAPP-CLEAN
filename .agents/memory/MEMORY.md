@@ -1,2 +1,3 @@
-- [Validation + auth patterns](validation-auth-patterns.md) — validateEmail/validateRequiredString throw (don't return), requireRole is sync, checkRateLimit returns NextResponse|null
-- [SAML + OIDC library API](saml-oidc-library-api.md) — @node-saml/node-saml v4 uses `idpCert` not `cert`; `getAuthorizeUrlAsync` returns `Promise<string>`; `ValidateInResponseTo` is an enum
+- [SharePoint provider refactor](sharepoint-provider-pattern.md) — SharePointStorageProvider delegates to lib/sharepoint-check.ts; credentials stay in SharePointConfig, never in StorageProvider.configuration_json.
+- [DMS upload service layer](dms-upload-service-layer.md) — DMS upload route now calls uploadDmsFile() from lib/storage/storage-service.ts; returns {fileId,webUrl,driveId,filePath} needed for DmsDocument FK fields.
+- [Storage provider auto-migration](storage-provider-auto-migration.md) — ensureSharePointProviderRegistered() auto-creates StorageProvider from SharePointConfig on first upload; called lazily, never blocks.
