@@ -1,0 +1,338 @@
+# 🚀 Phase 11 — Step 3
+
+# Azure User Sync + Group Mapping Foundation
+
+## Replit Optimized Prompt
+
+```text id="p11step3"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Phase 11 — Step 1 completed:
+- Identity provider architecture
+- Auth provider models
+- Authentication settings
+- Provider factory
+
+Phase 11 — Step 2 completed:
+- Azure AD / Entra ID login
+- Microsoft OAuth
+- Azure session handling
+- Company-aware Azure login
+- User auto creation/linking
+
+DO NOT break existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Build Azure AD User Sync + Group Mapping foundation.
+
+Requirements:
+- Import Azure users into system
+- Sync Azure groups
+- Map Azure groups to application roles
+- Support scheduled sync later
+- Keep LOCAL users fully working
+- Keep Azure login working
+
+DO NOT implement:
+- Background cron workers yet
+- SCIM
+- LDAP
+- SAML
+- OIDC
+- Full automation scheduling
+
+====================================================
+1. CREATE AZURE GROUP MODELS
+====================================================
+
+Add Prisma model:
+
+model IdentityGroupMapping {
+  id                    String   @id @default(uuid()) @db.Uuid
+
+  company_id            String   @db.Uuid
+
+  identity_provider_id  String   @db.Uuid
+
+  external_group_id     String
+  external_group_name   String
+
+  role_id               String?  @db.Uuid
+
+  auto_assign_role      Boolean  @default(true)
+
+  enabled               Boolean  @default(true)
+
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  company               Company @relation(fields: [company_id], references: [id])
+  identity_provider     IdentityProvider @relation(fields: [identity_provider_id], references: [id])
+  role                  Role? @relation(fields: [role_id], references: [id])
+
+  @@index([company_id])
+  @@index([identity_provider_id])
+}
+
+====================================================
+2. EXTEND USER MODEL
+====================================================
+
+Add fields:
+
+external_group_ids     Json?
+last_sync_at           DateTime?
+
+Rules:
+- Nullable
+- No breaking changes
+
+====================================================
+3. CREATE MICROSOFT GRAPH SERVICE
+====================================================
+
+Create:
+
+/lib/auth-providers/azure/graph.ts
+
+Responsibilities:
+- Acquire access token
+- Call Microsoft Graph
+- Fetch users
+- Fetch groups
+- Fetch memberships
+
+Use secure token handling.
+
+====================================================
+4. IMPLEMENT USER IMPORT
+====================================================
+
+Create backend service:
+
+syncAzureUsers()
+
+Requirements:
+- Fetch Azure users
+- Match by email
+- Create missing users
+- Update existing linked users
+- Preserve local users
+- Preserve manual roles unless auto mapping enabled
+
+====================================================
+5. USER IMPORT RULES
+====================================================
+
+When importing:
+
+If user exists:
+- Update Azure metadata only
+
+If user does not exist:
+- Create user:
+  - auth_provider = AZURE_AD
+  - is_external_user = true
+
+Never:
+- delete user
+- overwrite passwords
+- overwrite local users
+
+====================================================
+6. GROUP SYNC
+====================================================
+
+Fetch:
+- Azure groups
+- User memberships
+
+Store:
+- external_group_ids
+
+DO NOT fully automate role assignment yet.
+
+====================================================
+7. ROLE MAPPING UI
+====================================================
+
+Under:
+
+Admin
+ └── Authentication Settings
+      └── Azure Group Mapping
+
+Create UI table:
+
+Columns:
+- Azure Group
+- Azure Group ID
+- App Role
+- Auto Assign
+- Status
+
+Actions:
+- Edit
+- Disable
+
+====================================================
+8. CREATE ROLE MAPPING MODAL
+====================================================
+
+Fields:
+- Azure Group
+- App Role dropdown
+- Auto assign toggle
+- Enabled toggle
+
+Save mapping securely.
+
+====================================================
+9. CREATE USER IMPORT UI
+====================================================
+
+Add button:
+
+[ Import Azure Users ]
+
+Show:
+- Imported users count
+- Updated users count
+- Failed users count
+
+====================================================
+10. CREATE GROUP SYNC UI
+====================================================
+
+Add button:
+
+[ Sync Azure Groups ]
+
+Show:
+- Synced groups
+- Mapping status
+- Failures
+
+====================================================
+11. CREATE SYNC APIS
+====================================================
+
+Create secure APIs:
+
+POST /api/protected/auth/azure/import-users
+POST /api/protected/auth/azure/sync-groups
+
+GET  /api/protected/auth/group-mappings
+POST /api/protected/auth/group-mappings
+PUT  /api/protected/auth/group-mappings/[id]
+
+Requirements:
+- Company isolation
+- Role validation
+- Audit logging
+- Validation
+
+====================================================
+12. AUTO ROLE ASSIGNMENT
+====================================================
+
+When Azure user logs in:
+
+IF group mapping exists:
+- assign configured app role
+
+Rules:
+- only if auto_assign_role enabled
+- preserve manual overrides
+- prevent duplicate assignments
+
+====================================================
+13. USER PROFILE IMPROVEMENTS
+====================================================
+
+In user details page show:
+
+- Auth Provider
+- Azure Linked
+- External User
+- Last Sync
+- Azure Groups count
+
+====================================================
+14. AUDIT LOGGING
+====================================================
+
+Log:
+- User imports
+- Group syncs
+- Mapping updates
+- Auto role assignments
+- Sync failures
+
+Use existing audit system.
+
+====================================================
+15. SECURITY RULES
+====================================================
+
+- Validate company ownership
+- Validate Azure provider ownership
+- Prevent cross-company imports
+- Prevent role escalation
+- Validate Graph API responses
+
+====================================================
+16. PERFORMANCE RULES
+====================================================
+
+Requirements:
+- Batch imports
+- Avoid duplicate queries
+- Avoid duplicate users
+- Support future large directories
+
+====================================================
+17. IMPORTANT RULES
+====================================================
+
+- DO NOT break local users
+- DO NOT remove manual users
+- DO NOT implement scheduled jobs yet
+- DO NOT implement SCIM
+- DO NOT implement LDAP
+- DO NOT implement SAML
+- DO NOT delete users automatically
+- DO NOT overwrite passwords
+
+====================================================
+18. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Prisma generate
+- Prisma migrate
+- Typecheck
+- Azure login still works
+- Local login still works
+- Import works
+- Group mapping works
+- No TS errors
+- App boots cleanly
+
+====================================================
+19. OUTPUT
+====================================================
+
+At completion provide:
+- Models added
+- APIs added
+- UI added
+- Graph integration summary
+- Azure permissions required
+- Manual Azure setup steps
+- Future scheduling recommendations
+```

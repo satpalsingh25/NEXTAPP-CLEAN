@@ -2,10 +2,12 @@ import { NextRequest, NextResponse }    from "next/server";
 import { prisma }                        from "@/lib/prisma";
 import { exchangeCodeForTokens, validateIdToken } from "@/lib/auth-providers/azure-ad-client";
 import { createSessionResponse }         from "@/lib/auth-session";
+import { resolveMappedRole }             from "@/lib/auth-providers/azure/sync";
 import { logAudit }                      from "@/lib/audit-log";
 import { logInternalError }              from "@/lib/error-log";
 import { generateRequestId }             from "@/lib/api-response";
 import { getClientIp }                   from "@/lib/rate-limit";
+import type { Role }                     from "@prisma/client";
 
 /**
  * GET /api/auth/azure/callback
@@ -134,15 +136,33 @@ export async function GET(req: NextRequest) {
       }
 
       /* Link Azure identity if not already linked */
+      const groupMappings = await prisma.identityGroupMapping.findMany({
+        where: { company_id: provider.company_id, identity_provider_id: provider.id, enabled: true, auto_assign_role: true },
+      });
+      const userGroupIds = (user.external_group_ids as string[] | null) ?? [];
+      const mappedRole   = resolveMappedRole(userGroupIds, groupMappings) as Role | null;
+
+      const updateData: Record<string, unknown> = {};
       if (!user.external_user_id) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            auth_provider:    "AZURE_AD",
-            external_user_id: claims.oid,
-            is_external_user: true,
-          },
+        updateData.auth_provider    = "AZURE_AD";
+        updateData.external_user_id = claims.oid;
+        updateData.is_external_user = true;
+      }
+      updateData.last_sync_at = new Date();
+      if (mappedRole && mappedRole !== user.role) {
+        updateData.role = mappedRole;
+        void logAudit({
+          company_id:  user.company_id,
+          user_id:     user.id,
+          action:      "AZURE_AUTO_ROLE_ASSIGNED",
+          module:      "AUTH",
+          entity_type: "user",
+          entity_id:   user.id,
+          description: `Auto-assigned role ${mappedRole} via Azure group mapping`,
         });
+      }
+      if (Object.keys(updateData).length > 0) {
+        user = await prisma.user.update({ where: { id: user.id }, data: updateData });
       }
 
       void logAudit({

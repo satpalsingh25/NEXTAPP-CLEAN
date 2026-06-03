@@ -76,6 +76,7 @@ model Company {
   branding             Branding?
   identity_providers   IdentityProvider[]
   auth_settings        CompanyAuthSettings?
+  group_mappings       IdentityGroupMapping[]
 }
 
 model Branding {
@@ -131,6 +132,9 @@ model User {
   auth_provider            AuthProviderType  @default(LOCAL)
   external_user_id         String?
   is_external_user         Boolean           @default(false)
+  /* ── Azure sync fields ──────────────────────────────── */
+  external_group_ids       Json?
+  last_sync_at             DateTime?
 }
 
 model Vendor {
@@ -633,6 +637,7 @@ model IdentityProvider {
   updated_at         DateTime         @updatedAt
 
   company            Company          @relation(fields: [company_id], references: [id])
+  group_mappings     IdentityGroupMapping[]
 
   @@index([company_id])
   @@index([tenant_id])
@@ -657,4 +662,32 @@ model CompanyAuthSettings {
   updated_at                 DateTime @updatedAt
 
   company                    Company  @relation(fields: [company_id], references: [id])
+}
+
+/* ------------------------------------------------------------------ */
+/* IdentityGroupMapping — maps Azure AD groups to application roles   */
+/* per company and identity provider.                                  */
+/* ------------------------------------------------------------------ */
+model IdentityGroupMapping {
+  id                   String           @id @default(uuid()) @db.Uuid
+
+  company_id           String           @db.Uuid
+  identity_provider_id String           @db.Uuid
+
+  external_group_id    String
+  external_group_name  String
+
+  app_role             Role?
+
+  auto_assign_role     Boolean          @default(true)
+  enabled              Boolean          @default(true)
+
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+
+  company              Company          @relation(fields: [company_id], references: [id])
+  identity_provider    IdentityProvider @relation(fields: [identity_provider_id], references: [id])
+
+  @@index([company_id])
+  @@index([identity_provider_id])
 }
