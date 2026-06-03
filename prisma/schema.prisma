@@ -623,12 +623,19 @@ model IdentityProvider {
   name               String
   enabled            Boolean          @default(true)
   configuration_json Json?
+  /* ── Azure AD / OIDC connection fields ── */
+  client_id          String?
+  client_secret      String?
+  tenant_id          String?
+  redirect_uri       String?
+  scopes             String?
   created_at         DateTime         @default(now())
   updated_at         DateTime         @updatedAt
 
   company            Company          @relation(fields: [company_id], references: [id])
 
   @@index([company_id])
+  @@index([tenant_id])
 }
 
 /* ------------------------------------------------------------------ */

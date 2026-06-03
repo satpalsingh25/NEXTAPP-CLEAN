@@ -1,0 +1,331 @@
+# 🚀 Phase 11 — Step 2
+
+# Azure AD / Microsoft Entra ID Integration
+
+## Replit Optimized Prompt
+
+```text id="p11step2"
+You are working on an existing enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Phase 11 — Step 1 is already completed:
+- IdentityProvider model
+- CompanyAuthSettings
+- AuthProviderType enum
+- Provider architecture
+- Authentication settings UI
+- Provider factory
+- Provider placeholders
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Implement Microsoft Azure AD / Entra ID authentication.
+
+Requirements:
+- Keep LOCAL login fully working
+- Azure login must be OPTIONAL
+- Companies can use:
+  - Local only
+  - Azure only
+  - Hybrid (both)
+
+Must support:
+- Microsoft OAuth login
+- User auto creation
+- Existing user linking
+- Company isolation
+- Role mapping preparation
+- Secure token validation
+
+DO NOT implement:
+- Group sync yet
+- Full user import yet
+- SCIM
+- MFA
+- SAML
+
+====================================================
+1. INSTALL REQUIRED PACKAGES
+====================================================
+
+Install only required packages for Microsoft OAuth / JWT validation.
+
+Use stable packages compatible with current Next.js version.
+
+====================================================
+2. EXTEND IDENTITY PROVIDER MODEL
+====================================================
+
+Add fields to IdentityProvider model:
+
+client_id            String?
+client_secret        String?
+tenant_id            String?
+redirect_uri         String?
+
+scopes               String?
+
+Rules:
+- Nullable
+- No breaking migration
+- Secure storage ready
+
+====================================================
+3. CREATE AZURE CONFIGURATION UI
+====================================================
+
+Under:
+
+Admin
+ └── Authentication Settings
+
+Add:
+- “Add Azure AD Provider”
+
+Open modal/page with fields:
+
+- Provider Name
+- Tenant ID
+- Client ID
+- Client Secret
+- Redirect URI
+- Scopes
+
+Default scopes:
+
+openid profile email User.Read
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+4. STORE PROVIDER SECURELY
+====================================================
+
+Requirements:
+- Never expose client secret to frontend
+- Mask secret on edit
+- Store securely in DB
+- Use existing secure API patterns
+
+====================================================
+5. MICROSOFT LOGIN BUTTON
+====================================================
+
+On login page:
+
+IF company allows Azure login:
+
+Show button:
+
+[ Sign in with Microsoft ]
+
+Requirements:
+- Keep existing login form
+- Dynamic rendering
+- Do NOT hardcode single company
+
+====================================================
+6. COMPANY-AWARE LOGIN
+====================================================
+
+IMPORTANT.
+
+System is multi-tenant.
+
+Azure login must determine company correctly.
+
+Implement strategy:
+
+Option A:
+- User enters email first
+
+OR
+
+Option B:
+- Tenant/company slug login path
+
+Choose architecture that best fits current app.
+
+Requirements:
+- No cross-company login
+- No global unsafe login
+
+====================================================
+7. CREATE AZURE AUTH ROUTES
+====================================================
+
+Create APIs:
+
+/api/auth/azure/login
+/api/auth/azure/callback
+
+Flow:
+- Redirect to Microsoft
+- Validate response
+- Validate tenant
+- Validate email
+- Create/link user
+- Create session
+- Redirect to dashboard
+
+====================================================
+8. USER LINKING RULES
+====================================================
+
+If email already exists:
+- Link Azure account to existing user
+
+If user does not exist:
+- Auto create user
+
+Rules for auto-created user:
+- auth_provider = AZURE_AD
+- is_external_user = true
+- No password
+- Company assigned correctly
+
+====================================================
+9. SESSION HANDLING
+====================================================
+
+Use existing session/auth system.
+
+Requirements:
+- Azure users behave same as local users
+- Existing middleware must continue working
+- Existing permissions system unchanged
+
+====================================================
+10. SECURITY VALIDATION
+====================================================
+
+Validate:
+- issuer
+- audience
+- tenant ID
+- token expiry
+- nonce/state
+
+Prevent:
+- cross-tenant auth
+- fake token usage
+- replay attacks
+
+====================================================
+11. COMPANY ISOLATION
+====================================================
+
+VERY IMPORTANT.
+
+A user from:
+abc.com
+
+must NEVER login into:
+xyz company
+
+Enforce:
+- tenant validation
+- provider-company mapping
+- strict company checks
+
+====================================================
+12. LOGIN UI IMPROVEMENTS
+====================================================
+
+Refactor login page to support:
+
+- Local login
+- Microsoft login
+- Future providers
+
+Architecture must be provider-driven.
+
+====================================================
+13. AUDIT LOGGING
+====================================================
+
+Log:
+- Azure login success
+- Azure login failure
+- User auto creation
+- Provider updates
+- Failed validations
+
+Use existing audit system.
+
+====================================================
+14. TEST CONNECTION FEATURE
+====================================================
+
+Implement:
+
+“Test Connection”
+
+Requirements:
+- Validate tenant
+- Validate credentials
+- Validate Microsoft endpoints
+
+Show:
+- Success
+- Failure reason
+
+====================================================
+15. API SECURITY
+====================================================
+
+All APIs must:
+- validate role
+- validate company
+- validate permissions
+
+No public config exposure.
+
+====================================================
+16. IMPORTANT RULES
+====================================================
+
+- DO NOT break local login
+- DO NOT force Azure login
+- DO NOT remove passwords
+- DO NOT implement group sync yet
+- DO NOT implement user import yet
+- DO NOT implement SAML yet
+- DO NOT hardcode company IDs
+- DO NOT expose secrets
+
+====================================================
+17. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Prisma generate
+- Prisma migrate
+- Typecheck
+- Existing login works
+- Azure login works
+- Sessions work
+- Multi-tenant isolation works
+- No TS errors
+- App boots cleanly
+
+====================================================
+18. OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- APIs added
+- DB changes
+- Auth flow summary
+- Azure setup instructions
+- Required Azure portal settings
+- Redirect URI to configure
+- Any manual ENV needed
+```

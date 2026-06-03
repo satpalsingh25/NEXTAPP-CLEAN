@@ -11,30 +11,19 @@ interface PublicBranding {
   primary_color?: string | null;
 }
 
-/* ── Provider button descriptor ─────────────────────────────────────────────
-   Future phases will populate this from /api/branding/public or a dedicated
-   endpoint, driving dynamic rendering of SSO buttons.  For now only LOCAL
-   is active; the others are placeholders ready to be wired up.
-──────────────────────────────────────────────────────────────────────────── */
-interface LoginProvider {
-  id:      string;
-  label:   string;
-  enabled: boolean;
-  onClick?: () => void;
-}
-
-/* Local-login form component — isolated so the provider layer can render
-   it alongside SSO buttons without tight coupling. */
+/* ── Local login form ───────────────────────────────────────────────── */
 function LocalLoginForm({
   primary,
   onSuccess,
+  errorFromUrl,
 }: {
   primary: string;
   onSuccess: () => void;
+  errorFromUrl: string;
 }) {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [error,    setError]    = useState("");
+  const [error,    setError]    = useState(errorFromUrl);
   const [loading,  setLoading]  = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,34 +99,79 @@ function LocalLoginForm({
   );
 }
 
-/* ── Provider button rendered for each non-local SSO method ─────────── */
-function ProviderButton({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick?: () => void;
-}) {
+/* ── Microsoft sign-in button ───────────────────────────────────────── */
+function MicrosoftButton({ providerId }: { providerId: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+    <a
+      href={`/api/auth/azure/login?provider_id=${providerId}`}
+      className="w-full flex items-center justify-center gap-3 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
     >
-      {label}
-    </button>
+      {/* Microsoft logo SVG (official brand colors) */}
+      <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1"  y="1"  width="9" height="9" fill="#f25022" />
+        <rect x="11" y="1"  width="9" height="9" fill="#7fba00" />
+        <rect x="1"  y="11" width="9" height="9" fill="#00a4ef" />
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+      </svg>
+      Sign in with Microsoft
+    </a>
   );
 }
 
-/* ── Main page ──────────────────────────────────────────────────────── */
+/* ── Error messages for OAuth redirects ─────────────────────────────── */
+const OAUTH_ERRORS: Record<string, string> = {
+  azure_denied:          "Microsoft sign-in was cancelled.",
+  azure_auth_failed:     "Microsoft authentication failed. Please try again.",
+  state_mismatch:        "Security check failed. Please try again.",
+  company_mismatch:      "Your Microsoft account is not authorised for this organisation.",
+  auto_import_disabled:  "Your account does not exist here. Contact your administrator.",
+  account_disabled:      "Your account has been disabled. Contact your administrator.",
+  provider_not_configured: "Microsoft login is not fully configured yet.",
+  provider_unavailable:  "Microsoft login is temporarily unavailable.",
+  invalid_callback:      "Invalid login response. Please try again.",
+};
+
+/* ── Main login page ────────────────────────────────────────────────── */
 export default function LoginPage() {
-  const [b, setB] = useState<PublicBranding>({});
+  const [b,           setB]           = useState<PublicBranding>({});
+  const [azureIds,    setAzureIds]    = useState<string[]>([]);
+  const [showLocal,   setShowLocal]   = useState(true);
+  const [urlError,    setUrlError]    = useState("");
 
   useEffect(() => {
+    /* Parse error from OAuth redirect */
+    const params = new URLSearchParams(window.location.search);
+    const err    = params.get("error");
+    if (err) setUrlError(OAUTH_ERRORS[err] ?? "Authentication failed. Please try again.");
+
+    /* Load branding */
     fetch("/api/branding/public")
       .then((r) => (r.ok ? r.json() : {}))
       .then((data) => setB(data || {}))
       .catch(() => setB({}));
+
+    /* Load enabled providers — drives which buttons appear */
+    fetch("/api/auth/providers")
+      .then((r) => (r.ok ? r.json() : { providers: [] }))
+      .then((data: { providers: string[] }) => {
+        const types = data.providers ?? [];
+        setShowLocal(types.includes("LOCAL") || types.length === 0);
+        /* For Azure: we also need the provider IDs to build the login URL */
+      })
+      .catch(() => {
+        setShowLocal(true);
+      });
+
+    /* Load Azure provider IDs separately for button href construction */
+    fetch("/api/protected/identity-providers")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((providers: { id: string; provider_type: string; enabled: boolean }[]) => {
+        const ids = providers
+          .filter((p) => p.provider_type === "AZURE_AD" && p.enabled)
+          .map((p) => p.id);
+        setAzureIds(ids);
+      })
+      .catch(() => setAzureIds([]));
   }, []);
 
   const bg = b.login_bg ?? "";
@@ -151,24 +185,7 @@ export default function LoginPage() {
   const primary = b.primary_color || "#0f172a";
   const appName = b.app_name || "Compliance & AMC";
 
-  /* ── Active providers list ──────────────────────────────────────────
-     Phase 12+ will fetch enabled providers from the server and build
-     this list dynamically.  For now only LOCAL is active.
-  ─────────────────────────────────────────────────────────────────── */
-  const providers: LoginProvider[] = [
-    { id: "LOCAL", label: "Sign in with email", enabled: true },
-    /* Future SSO entries added here by the provider-rendering phase:
-       { id: "AZURE_AD",         label: "Continue with Microsoft",       enabled: false },
-       { id: "GOOGLE_WORKSPACE", label: "Continue with Google",          enabled: false },
-       { id: "LDAP",             label: "Continue with LDAP",            enabled: false },
-       { id: "SAML",             label: "Continue with SSO",             enabled: false },
-       { id: "OIDC",             label: "Continue with OIDC",            enabled: false },
-    */
-  ];
-
-  const activeProviders = providers.filter((p) => p.enabled);
-  const hasExternalProviders = activeProviders.some((p) => p.id !== "LOCAL");
-  const hasLocalProvider     = activeProviders.some((p) => p.id === "LOCAL");
+  const hasExternalProviders = azureIds.length > 0;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
@@ -198,33 +215,39 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-slate-600">Access your {appName} account</p>
         </div>
 
-        {/* External SSO buttons rendered first when present */}
-        {hasExternalProviders && (
-          <div className="space-y-2 mb-4">
-            {activeProviders
-              .filter((p) => p.id !== "LOCAL")
-              .map((p) => (
-                <ProviderButton key={p.id} label={p.label} onClick={p.onClick} />
-              ))}
+        {/* OAuth error message */}
+        {urlError && (
+          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">
+            {urlError}
           </div>
         )}
 
-        {/* Divider shown only when both local and SSO are available */}
-        {hasExternalProviders && hasLocalProvider && (
+        {/* Azure AD / Microsoft buttons */}
+        {hasExternalProviders && (
+          <div className="space-y-2 mb-4">
+            {azureIds.map((id) => (
+              <MicrosoftButton key={id} providerId={id} />
+            ))}
+          </div>
+        )}
+
+        {/* Divider between SSO and local form */}
+        {hasExternalProviders && showLocal && (
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
-            <div className="relative flex justify-center text-xs text-slate-400 bg-white px-2">
-              or continue with email
+            <div className="relative flex justify-center">
+              <span className="bg-white px-2 text-xs text-slate-400">or continue with email</span>
             </div>
           </div>
         )}
 
         {/* Local login form */}
-        {hasLocalProvider && (
+        {showLocal && (
           <LocalLoginForm
             primary={primary}
+            errorFromUrl=""
             onSuccess={() => { window.location.href = "/dashboard"; }}
           />
         )}
