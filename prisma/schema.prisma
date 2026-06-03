@@ -35,6 +35,15 @@ enum Action {
   REJECTED
 }
 
+enum AuthProviderType {
+  LOCAL
+  AZURE_AD
+  GOOGLE_WORKSPACE
+  LDAP
+  SAML
+  OIDC
+}
+
 model Company {
   id                   String             @id @default(uuid()) @db.Uuid
   name                 String
@@ -65,6 +74,8 @@ model Company {
   email_templates      EmailTemplate[]
   company_folder_name  String?
   branding             Branding?
+  identity_providers   IdentityProvider[]
+  auth_settings        CompanyAuthSettings?
 }
 
 model Branding {
@@ -116,6 +127,10 @@ model User {
   /* ── Security fields ───────────────────────────── */
   failed_login_attempts    Int               @default(0)
   locked_until             DateTime?
+  /* ── Identity provider fields ───────────────────── */
+  auth_provider            AuthProviderType  @default(LOCAL)
+  external_user_id         String?
+  is_external_user         Boolean           @default(false)
 }
 
 model Vendor {
@@ -595,4 +610,44 @@ model PasswordResetToken {
   created_at DateTime  @default(now())
 
   @@index([user_id])
+}
+
+/* ------------------------------------------------------------------ */
+/* IdentityProvider — one row per configured external auth provider   */
+/* per company. configuration_json holds provider-specific settings.  */
+/* ------------------------------------------------------------------ */
+model IdentityProvider {
+  id                 String           @id @default(uuid()) @db.Uuid
+  company_id         String           @db.Uuid
+  provider_type      AuthProviderType
+  name               String
+  enabled            Boolean          @default(true)
+  configuration_json Json?
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
+
+  company            Company          @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+/* ------------------------------------------------------------------ */
+/* CompanyAuthSettings — one row per company controlling which        */
+/* authentication methods are permitted.                              */
+/* ------------------------------------------------------------------ */
+model CompanyAuthSettings {
+  id                         String   @id @default(uuid()) @db.Uuid
+  company_id                 String   @unique @db.Uuid
+  allow_local_login          Boolean  @default(true)
+  allow_azure_login          Boolean  @default(false)
+  allow_google_login         Boolean  @default(false)
+  allow_ldap_login           Boolean  @default(false)
+  allow_saml_login           Boolean  @default(false)
+  allow_oidc_login           Boolean  @default(false)
+  auto_import_external_users Boolean  @default(false)
+  auto_disable_removed_users Boolean  @default(false)
+  created_at                 DateTime @default(now())
+  updated_at                 DateTime @updatedAt
+
+  company                    Company  @relation(fields: [company_id], references: [id])
 }

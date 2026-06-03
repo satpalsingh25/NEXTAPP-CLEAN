@@ -111,7 +111,8 @@ const ALL_MODULES: NavModule[] = [
       { name: "Template Settings",    href: "/admin/email-templates", icon: FileCode,   group: "Mail Settings" },
 
       /* ── System group ── */
-      { name: "Audit Logs",           href: "/admin/audit-logs",      icon: ScrollText, group: "System" },
+      { name: "Audit Logs",              href: "/admin/audit-logs",               icon: ScrollText,  group: "System" },
+      { name: "Authentication Settings", href: "/admin/authentication-settings",  icon: ShieldCheck, group: "System" },
     ],
   },
 ];

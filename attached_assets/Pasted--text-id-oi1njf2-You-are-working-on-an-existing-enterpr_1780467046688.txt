@@ -1,0 +1,367 @@
+```text id="oi1njf2"
+You are working on an existing enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Current system already has:
+- Authentication
+- Multi-company support
+- Roles & permissions
+- Super Admin / Admin
+- AMC / Compliance / DMS modules
+- SharePoint integration
+- Audit system
+- Branding system
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Build Phase 11 — Step 1:
+Enterprise Identity Foundation.
+
+IMPORTANT:
+This step is NOT Azure AD implementation yet.
+
+This step only builds:
+- Identity provider architecture
+- Database models
+- Authentication provider abstraction
+- Company authentication settings
+- Future-ready provider support
+
+This architecture must support:
+
+- LOCAL authentication
+- AZURE_AD / Entra ID
+- GOOGLE_WORKSPACE
+- LDAP / ACTIVE_DIRECTORY
+- SAML
+- OIDC
+
+in future phases.
+
+====================================================
+REQUIREMENTS
+====================================================
+
+1. CREATE ENUM
+====================================================
+
+Add Prisma enum:
+
+enum AuthProviderType {
+  LOCAL
+  AZURE_AD
+  GOOGLE_WORKSPACE
+  LDAP
+  SAML
+  OIDC
+}
+
+====================================================
+2. EXTEND USER MODEL
+====================================================
+
+Extend existing User model safely.
+
+Add fields:
+
+auth_provider        AuthProviderType @default(LOCAL)
+external_user_id     String?
+is_external_user     Boolean @default(false)
+
+Rules:
+- Existing local users must continue working
+- Existing passwords must remain untouched
+- No migration/data loss
+- auth_provider defaults to LOCAL
+
+====================================================
+3. CREATE IDENTITY PROVIDER MODEL
+====================================================
+
+Create Prisma model:
+
+model IdentityProvider {
+  id                  String   @id @default(uuid()) @db.Uuid
+
+  company_id          String   @db.Uuid
+  provider_type       AuthProviderType
+
+  name                String
+
+  enabled             Boolean  @default(true)
+
+  configuration_json  Json?
+
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  company             Company  @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+====================================================
+4. COMPANY AUTHENTICATION SETTINGS
+====================================================
+
+Create Prisma model:
+
+model CompanyAuthSettings {
+  id                          String   @id @default(uuid()) @db.Uuid
+
+  company_id                  String   @unique @db.Uuid
+
+  allow_local_login           Boolean  @default(true)
+
+  allow_azure_login           Boolean  @default(false)
+
+  allow_google_login          Boolean  @default(false)
+
+  allow_ldap_login            Boolean  @default(false)
+
+  allow_saml_login            Boolean  @default(false)
+
+  allow_oidc_login            Boolean  @default(false)
+
+  auto_import_external_users  Boolean  @default(false)
+
+  auto_disable_removed_users  Boolean  @default(false)
+
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+
+  company                     Company  @relation(fields: [company_id], references: [id])
+}
+
+====================================================
+5. COMPANY RELATIONS
+====================================================
+
+Add relations to Company model:
+
+identity_providers    IdentityProvider[]
+auth_settings         CompanyAuthSettings?
+
+====================================================
+6. SAFE MIGRATION
+====================================================
+
+Requirements:
+- Generate Prisma migration safely
+- Preserve all existing data
+- No table recreation
+- No auth breakage
+- No existing login impact
+
+Run:
+- prisma generate
+- prisma migrate
+- typecheck
+
+====================================================
+7. BACKEND ARCHITECTURE
+====================================================
+
+Create new folder structure:
+
+/lib/auth-providers/
+/lib/auth-providers/providers/
+/lib/auth-providers/types.ts
+
+====================================================
+8. CREATE PROVIDER INTERFACE
+====================================================
+
+Create interface:
+
+export interface IdentityAuthProvider {
+  authenticate(): Promise<any>
+  syncUsers?(): Promise<any>
+  syncGroups?(): Promise<any>
+  testConnection?(): Promise<any>
+}
+
+====================================================
+9. CREATE PLACEHOLDER PROVIDERS
+====================================================
+
+Create empty provider classes:
+
+- LocalAuthProvider
+- AzureAdProvider
+- GoogleWorkspaceProvider
+- LdapProvider
+- SamlProvider
+- OidcProvider
+
+All should implement IdentityAuthProvider.
+
+DO NOT implement login logic yet.
+
+Only architecture placeholders.
+
+====================================================
+10. CREATE AUTH PROVIDER FACTORY
+====================================================
+
+Create:
+
+/lib/auth-providers/factory.ts
+
+Factory should return provider instance by type.
+
+Example:
+
+getAuthProvider(type)
+
+====================================================
+11. ADMIN UI
+====================================================
+
+Add new admin menu:
+
+Admin
+ └── Authentication Settings
+
+Access:
+- SUPER_ADMIN
+- ADMIN
+
+NOT regular users.
+
+====================================================
+12. AUTHENTICATION SETTINGS PAGE
+====================================================
+
+Create page:
+
+/admin/authentication-settings
+
+Page must:
+- Match existing UI design
+- Use existing layout/components
+- Be responsive
+
+====================================================
+13. SETTINGS UI
+====================================================
+
+Show toggles:
+
+[✔] Enable Local Login
+[ ] Enable Azure Login
+[ ] Enable Google Login
+[ ] Enable LDAP Login
+[ ] Enable SAML Login
+[ ] Enable OIDC Login
+
+Additional toggles:
+
+[ ] Auto Import External Users
+[ ] Auto Disable Removed Users
+
+====================================================
+14. PROVIDER MANAGEMENT SECTION
+====================================================
+
+Below settings create table:
+
+Identity Providers
+
+Columns:
+- Name
+- Provider Type
+- Status
+- Created Date
+- Actions
+
+Actions:
+- View
+- Edit
+- Disable
+
+NO provider configuration forms yet.
+
+Only architecture/UI.
+
+====================================================
+15. API ROUTES
+====================================================
+
+Create secure APIs:
+
+GET    /api/protected/auth-settings
+PUT    /api/protected/auth-settings
+
+GET    /api/protected/identity-providers
+
+Requirements:
+- Company isolation
+- Role protection
+- Audit logging
+- Validation
+
+====================================================
+16. AUDIT LOGGING
+====================================================
+
+Log:
+- Auth settings updates
+- Provider create/update/disable
+- Toggle changes
+
+Use existing audit system.
+
+====================================================
+17. LOGIN PAGE PREPARATION
+====================================================
+
+DO NOT implement Azure login yet.
+
+But refactor login page architecture to support:
+- Multiple login buttons later
+- Dynamic provider rendering
+
+Keep current login fully working.
+
+====================================================
+18. IMPORTANT RULES
+====================================================
+
+- DO NOT break existing login
+- DO NOT remove password login
+- DO NOT implement OAuth yet
+- DO NOT implement Azure yet
+- DO NOT implement LDAP yet
+- DO NOT implement SAML yet
+- Only architecture + DB + UI + APIs
+
+====================================================
+19. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Run Prisma generate
+- Run migration
+- Run typecheck
+- Ensure zero TS errors
+- Ensure login still works
+- Ensure existing users unaffected
+- Ensure app boots cleanly
+
+====================================================
+20. OUTPUT
+====================================================
+
+At the end provide:
+- Files created
+- Models added
+- APIs added
+- UI added
+- Migration summary
+- Any manual steps needed
+```
