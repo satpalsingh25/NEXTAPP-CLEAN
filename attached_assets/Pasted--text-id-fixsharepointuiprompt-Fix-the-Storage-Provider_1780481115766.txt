@@ -1,0 +1,269 @@
+```text id="fixsharepointuiprompt"
+Fix the Storage Providers UI refactor in NEXTAPP-CLEAN.
+
+Current issue:
+- Google Drive modal works correctly
+- Dynamic provider modal architecture is working
+- BUT old SharePoint Settings page/menu still exists
+- SharePoint configuration redirects to old dedicated page
+- This breaks the unified provider experience
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Fully migrate SharePoint configuration into the new:
+
+Admin
+ └── Storage Providers
+
+architecture.
+
+Remove dependency on old:
+SharePoint Settings page.
+
+ALL storage providers must now use:
+- same provider table
+- same modal architecture
+- same dynamic provider flow
+
+====================================================
+REQUIRED FIXES
+====================================================
+
+1. REMOVE OLD ADMIN MENU
+====================================================
+
+Remove old menu entry:
+
+Admin
+ └── SharePoint Settings
+
+Requirements:
+- remove from sidebar
+- remove from navigation
+- remove old redirects
+
+DO NOT delete backend logic yet.
+
+====================================================
+2. STOP REDIRECTING TO OLD PAGE
+====================================================
+
+Current issue:
+SharePoint provider edit/create still redirects to old page.
+
+Fix:
+- SharePoint must open inside:
+StorageProviderModal
+
+exactly like:
+Google Drive modal.
+
+====================================================
+3. SHAREPOINT MUST USE DYNAMIC MODAL
+====================================================
+
+When user clicks:
+
+[ Add Provider ]
+→ SharePoint
+
+OR
+
+Edit existing SharePoint provider
+
+Open:
+
+StorageProviderModal
+
+and render:
+
+<SharePointFields />
+
+NO page redirect.
+
+====================================================
+4. REFACTOR SHAREPOINT FIELDS COMPONENT
+====================================================
+
+Move ALL SharePoint form logic into:
+
+/components/storage/provider-fields/sharepoint-fields.tsx
+
+This component must fully support:
+- Create mode
+- Edit mode
+- Existing provider loading
+- Validation
+- Save/update
+- Test connection
+
+====================================================
+5. REMOVE OLD SHAREPOINT PAGE DEPENDENCY
+====================================================
+
+Existing page likely exists:
+
+/admin/sharepoint-settings
+OR similar.
+
+Requirements:
+- stop using it
+- stop navigating to it
+- stop linking to it
+
+OPTIONAL:
+Keep page temporarily for backward compatibility,
+but hidden/unreachable from UI.
+
+====================================================
+6. UNIFY PROVIDER EXPERIENCE
+====================================================
+
+ALL providers must behave identically:
+
+✔ SharePoint
+✔ Google Drive
+✔ AWS S3
+✔ Azure Blob
+
+Flow:
+
+Storage Providers page
+   ↓
+Provider table
+   ↓
+Add/Edit
+   ↓
+Dynamic modal
+   ↓
+Provider-specific fields component
+
+NO provider-specific pages.
+
+====================================================
+7. FIX EDIT FLOW
+====================================================
+
+Edit button in provider table must:
+
+- load provider data
+- populate modal dynamically
+- never redirect
+
+====================================================
+8. FIX TEST CONNECTION FLOW
+====================================================
+
+Test Connection must:
+- run inside modal
+- show toast/status
+- never redirect
+
+====================================================
+9. FIX SAVE FLOW
+====================================================
+
+Save must:
+- create/update provider
+- refresh provider table
+- close modal
+- no page reload if possible
+
+====================================================
+10. SHAREPOINT CONFIG FIELDS
+====================================================
+
+Inside modal show:
+
+- Provider Name
+- Tenant ID
+- Client ID
+- Client Secret
+- Site ID
+- Drive ID
+- Root Folder
+
+Requirements:
+- secrets masked
+- dark/light theme support
+- validation
+- responsive
+
+====================================================
+11. REMOVE OLD ROUTE USAGE
+====================================================
+
+Search entire codebase for:
+- old SharePoint settings routes
+- old navigation links
+- old redirects
+
+Replace all with:
+Storage Providers modal architecture.
+
+====================================================
+12. KEEP BACKEND COMPATIBILITY
+====================================================
+
+DO NOT break:
+- existing SharePoint uploads
+- existing DMS uploads
+- existing Compliance uploads
+- existing AMC uploads
+
+This is UI refactor only.
+
+====================================================
+13. THEME FIXES
+====================================================
+
+Ensure:
+- dark mode headers visible
+- no black-on-black text
+- modal colors correct
+- table readable
+
+====================================================
+14. FINAL ARCHITECTURE
+====================================================
+
+Final Admin structure:
+
+Admin
+ ├── Authentication Settings
+ ├── Storage Providers
+ ├── Mail Settings
+ └── DMS Settings
+
+NO standalone SharePoint Settings menu.
+
+====================================================
+15. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- SharePoint modal works
+- Google Drive modal works
+- No redirect to old page
+- Old menu removed
+- Existing providers editable
+- Existing uploads work
+- Dark/light themes work
+- No TS errors
+- App boots cleanly
+
+====================================================
+16. OUTPUT
+====================================================
+
+Provide:
+- Files updated
+- Removed routes/pages
+- Refactor summary
+- Final provider flow summary
+```

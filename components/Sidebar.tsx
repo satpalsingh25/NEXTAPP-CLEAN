@@ -23,7 +23,6 @@ import {
   BadgeCheck,
   Mail,
   FileCode,
-  Cloud,
   HardDrive,
   FolderOpen,
   ScrollText,
@@ -104,7 +103,6 @@ const ALL_MODULES: NavModule[] = [
       /* ── Company Settings group ── */
       { name: "General",              href: "/admin/companies",                       icon: Building2, perm: "super_admin", group: "Company Settings" },
       { name: "Branding",             href: "/admin/company-settings/branding",       icon: Building2,                      group: "Company Settings" },
-      { name: "SharePoint Settings",  href: "/admin/sharepoint",         icon: Cloud,      group: "Company Settings" },
       { name: "DMS Settings",         href: "/admin/dms-settings",       icon: HardDrive,  group: "Company Settings" },
       { name: "Storage Providers",    href: "/admin/storage-providers",   icon: Database,   group: "Company Settings" },
 
