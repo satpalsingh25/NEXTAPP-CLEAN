@@ -13,19 +13,30 @@ const SAFE_SELECT = {
   name:                true,
   provider_type:       true,
   enabled:             true,
+  /* Azure AD / OIDC shared */
   client_id:           true,
   tenant_id:           true,
   redirect_uri:        true,
   scopes:              true,
+  /* LDAP */
   ldap_url:            true,
   ldap_bind_dn:        true,
   ldap_base_dn:        true,
   ldap_user_filter:    true,
   ldap_group_filter:   true,
   ldap_tls_enabled:    true,
+  /* SAML 2.0 */
+  saml_entry_point:    true,
+  saml_issuer:         true,
+  saml_logout_url:     true,
+  /* saml_certificate intentionally excluded (IdP cert, large + sensitive) */
+  /* OIDC */
+  oidc_issuer_url:     true,
+  oidc_client_id:      true,
+  oidc_discovery_url:  true,
+  /* oidc_client_secret intentionally excluded */
   created_at:          true,
   updated_at:          true,
-  /* client_secret + ldap_bind_password intentionally excluded */
 };
 
 /* ── GET /api/protected/identity-providers ─────────────────────────── */
@@ -75,13 +86,13 @@ export async function POST(req: NextRequest) {
         provider_type,
         name,
         enabled:             true,
-        /* Azure AD / OIDC fields */
+        /* Azure AD shared */
         client_id:           (body.client_id as string)    || null,
         client_secret:       (body.client_secret as string) || null,
         tenant_id:           (body.tenant_id as string)    || null,
         redirect_uri:        (body.redirect_uri as string) || null,
         scopes:              (body.scopes as string)        || null,
-        /* LDAP fields */
+        /* LDAP */
         ldap_url:            (body.ldap_url as string)            || null,
         ldap_bind_dn:        (body.ldap_bind_dn as string)        || null,
         ldap_bind_password:  (body.ldap_bind_password as string)  || null,
@@ -89,6 +100,16 @@ export async function POST(req: NextRequest) {
         ldap_user_filter:    (body.ldap_user_filter as string)    || null,
         ldap_group_filter:   (body.ldap_group_filter as string)   || null,
         ldap_tls_enabled:    typeof body.ldap_tls_enabled === "boolean" ? body.ldap_tls_enabled : false,
+        /* SAML 2.0 */
+        saml_entry_point:    (body.saml_entry_point as string)  || null,
+        saml_issuer:         (body.saml_issuer as string)       || null,
+        saml_certificate:    (body.saml_certificate as string)  || null,
+        saml_logout_url:     (body.saml_logout_url as string)   || null,
+        /* Generic OIDC */
+        oidc_issuer_url:     (body.oidc_issuer_url as string)    || null,
+        oidc_client_id:      (body.oidc_client_id as string)     || null,
+        oidc_client_secret:  (body.oidc_client_secret as string) || null,
+        oidc_discovery_url:  (body.oidc_discovery_url as string) || null,
       },
       select: SAFE_SELECT,
     });

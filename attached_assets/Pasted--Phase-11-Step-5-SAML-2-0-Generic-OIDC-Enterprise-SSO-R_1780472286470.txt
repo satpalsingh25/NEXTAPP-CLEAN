@@ -1,0 +1,369 @@
+# 🚀 Phase 11 — Step 5
+
+# SAML 2.0 + Generic OIDC Enterprise SSO
+
+## Replit Optimized Prompt
+
+```text id="p11step5"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 11 Step 1 → Identity architecture
+- Phase 11 Step 2 → Azure AD login
+- Phase 11 Step 3 → Azure user sync + group mapping
+- Phase 11 Step 4 → LDAP / Active Directory integration
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Build Generic Enterprise SSO support using:
+
+- SAML 2.0
+- OpenID Connect (OIDC)
+
+This enables compatibility with:
+- Okta
+- Auth0
+- Keycloak
+- OneLogin
+- Ping Identity
+- Google Workspace SSO
+- Enterprise IdPs
+
+Requirements:
+- Keep LOCAL login working
+- Keep Azure login working
+- Keep LDAP login working
+- Multi-tenant safe
+- Optional provider usage
+- Hybrid authentication support
+
+====================================================
+1. INSTALL REQUIRED PACKAGES
+====================================================
+
+Install stable libraries for:
+- SAML 2.0
+- OpenID Connect (OIDC)
+- JWT validation
+- Metadata parsing
+
+Use packages compatible with current Next.js version.
+
+====================================================
+2. EXTEND IDENTITY PROVIDER MODEL
+====================================================
+
+Add nullable fields:
+
+saml_entry_point          String?
+saml_issuer               String?
+saml_certificate          String?
+saml_logout_url           String?
+
+oidc_issuer_url           String?
+oidc_client_id            String?
+oidc_client_secret        String?
+oidc_discovery_url        String?
+
+Rules:
+- Safe migration
+- No breaking auth
+- No table recreation
+
+====================================================
+3. CREATE SAML PROVIDER
+====================================================
+
+Create:
+
+/lib/auth-providers/providers/saml-provider.ts
+
+Responsibilities:
+- Generate auth request
+- Validate SAML response
+- Extract user claims
+- Create/link users
+- Logout support foundation
+
+Must implement:
+IdentityAuthProvider
+
+====================================================
+4. CREATE OIDC PROVIDER
+====================================================
+
+Create:
+
+/lib/auth-providers/providers/oidc-provider.ts
+
+Responsibilities:
+- OIDC login flow
+- Token validation
+- User info fetch
+- Create/link users
+
+Must implement:
+IdentityAuthProvider
+
+====================================================
+5. CREATE SAML CONFIGURATION UI
+====================================================
+
+Under:
+
+Admin
+ └── Authentication Settings
+
+Add:
+[ Add SAML Provider ]
+
+Fields:
+
+- Provider Name
+- Entry Point URL
+- Issuer
+- X509 Certificate
+- Logout URL
+- Enable SAML Login
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+6. CREATE OIDC CONFIGURATION UI
+====================================================
+
+Add:
+[ Add OIDC Provider ]
+
+Fields:
+
+- Provider Name
+- Issuer URL
+- Discovery URL
+- Client ID
+- Client Secret
+- Scopes
+
+Default scopes:
+
+openid profile email
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+7. SECURE SECRET HANDLING
+====================================================
+
+Requirements:
+- Never expose secrets
+- Mask secrets on edit
+- Store securely
+- No frontend leaks
+
+====================================================
+8. LOGIN PAGE REFACTOR
+====================================================
+
+Refactor login page to fully support dynamic providers:
+
+Possible buttons:
+- Local Login
+- Microsoft Login
+- LDAP Login
+- SAML Login
+- OIDC Login
+
+Requirements:
+- Dynamically render enabled providers
+- Company-aware login
+- Responsive UI
+
+====================================================
+9. COMPANY-AWARE SSO
+====================================================
+
+IMPORTANT.
+
+Must prevent:
+- cross-company login
+- provider misuse
+- tenant confusion
+
+Implement:
+- provider-company mapping
+- strict validation
+- tenant-safe redirects
+
+====================================================
+10. CREATE SAML AUTH FLOW
+====================================================
+
+Create routes:
+
+/api/auth/saml/login
+/api/auth/saml/callback
+
+Flow:
+- Redirect to IdP
+- Validate SAML assertion
+- Validate signature
+- Extract claims
+- Create/link user
+- Create session
+
+====================================================
+11. CREATE OIDC AUTH FLOW
+====================================================
+
+Create routes:
+
+/api/auth/oidc/login
+/api/auth/oidc/callback
+
+Flow:
+- Redirect to provider
+- Validate token
+- Validate issuer/audience
+- Extract claims
+- Create/link user
+- Create session
+
+====================================================
+12. USER LINKING RULES
+====================================================
+
+If user email exists:
+- Link provider account
+
+If user missing:
+- Auto create:
+  - auth_provider = SAML or OIDC
+  - is_external_user = true
+
+Never:
+- overwrite passwords
+- remove local users
+
+====================================================
+13. CLAIM MAPPING FOUNDATION
+====================================================
+
+Prepare claim mapping support:
+
+Store:
+- external_user_id
+- provider metadata
+- claim payload
+
+Future-ready for:
+- group mapping
+- role mapping
+
+====================================================
+14. TEST CONNECTION FEATURE
+====================================================
+
+Implement:
+[Test Connection]
+
+Validate:
+- Metadata access
+- Discovery URL
+- Certificates
+- Issuer validation
+- Endpoint accessibility
+
+====================================================
+15. AUDIT LOGGING
+====================================================
+
+Log:
+- SSO login success/failure
+- Provider updates
+- Failed assertions
+- Failed token validation
+- Auto-created users
+
+Use existing audit system.
+
+====================================================
+16. SECURITY REQUIREMENTS
+====================================================
+
+Validate:
+- SAML signatures
+- OIDC issuer
+- audience
+- token expiry
+- replay protection
+- nonce/state
+
+Prevent:
+- forged assertions
+- replay attacks
+- cross-company auth
+
+====================================================
+17. API SECURITY
+====================================================
+
+All APIs must:
+- validate permissions
+- validate company ownership
+- prevent provider leakage
+- protect secrets
+
+====================================================
+18. IMPORTANT RULES
+====================================================
+
+- DO NOT break local login
+- DO NOT break Azure login
+- DO NOT break LDAP login
+- DO NOT force SSO
+- DO NOT expose secrets
+- DO NOT implement SCIM yet
+- DO NOT implement scheduled jobs yet
+- DO NOT remove password auth
+
+====================================================
+19. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Prisma generate
+- Prisma migrate
+- Typecheck
+- Local login works
+- Azure login works
+- LDAP login works
+- SAML login works
+- OIDC login works
+- Multi-tenant isolation works
+- No TS errors
+- App boots cleanly
+
+====================================================
+20. OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- APIs added
+- DB changes
+- Supported providers
+- Sample Okta setup
+- Sample Auth0 setup
+- Sample Keycloak setup
+- Required callback URLs
+- Any manual ENV needed
+```

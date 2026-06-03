@@ -4,28 +4,28 @@ import { prisma }       from "@/lib/prisma";
 /**
  * GET /api/auth/providers
  *
- * Public endpoint — returns the set of provider types that are
- * currently enabled on at least one company.  Used by the login page
- * to decide which buttons to render.  No secrets are returned.
+ * Public endpoint — returns enabled provider types AND their provider IDs
+ * (grouped by type, no secrets). Used by the login page to render the
+ * correct set of buttons dynamically.
  */
 export async function GET() {
   try {
-    /* Union of all enabled provider types across companies */
     const providers = await prisma.identityProvider.findMany({
       where:  { enabled: true },
-      select: {
-        id:            true,
-        name:          true,
-        provider_type: true,
-        company_id:    true,
-      },
+      select: { id: true, name: true, provider_type: true },
     });
 
-    /* Return distinct list of provider types (no company data, no secrets) */
     const types = [...new Set(providers.map((p) => p.provider_type))];
 
-    return NextResponse.json({ providers: types });
+    /* Group provider IDs by type for redirect-based buttons */
+    const byType: Record<string, { id: string; name: string }[]> = {};
+    for (const p of providers) {
+      if (!byType[p.provider_type]) byType[p.provider_type] = [];
+      byType[p.provider_type].push({ id: p.id, name: p.name });
+    }
+
+    return NextResponse.json({ providers: types, byType });
   } catch {
-    return NextResponse.json({ providers: [] });
+    return NextResponse.json({ providers: [], byType: {} });
   }
 }

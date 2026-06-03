@@ -12,19 +12,30 @@ const SAFE_SELECT = {
   name:                true,
   provider_type:       true,
   enabled:             true,
+  /* Azure AD shared */
   client_id:           true,
   tenant_id:           true,
   redirect_uri:        true,
   scopes:              true,
+  /* LDAP */
   ldap_url:            true,
   ldap_bind_dn:        true,
   ldap_base_dn:        true,
   ldap_user_filter:    true,
   ldap_group_filter:   true,
   ldap_tls_enabled:    true,
+  /* SAML 2.0 */
+  saml_entry_point:    true,
+  saml_issuer:         true,
+  saml_logout_url:     true,
+  /* saml_certificate intentionally excluded */
+  /* OIDC */
+  oidc_issuer_url:     true,
+  oidc_client_id:      true,
+  oidc_discovery_url:  true,
+  /* oidc_client_secret intentionally excluded */
   created_at:          true,
   updated_at:          true,
-  /* client_secret + ldap_bind_password intentionally excluded from all reads */
 };
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -81,18 +92,26 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     /* Build update payload — only include secrets when explicitly provided (non-empty) */
     const updateData: Record<string, unknown> = {
       name,
-      /* Azure AD / OIDC fields */
-      client_id:         body.client_id    !== undefined ? ((body.client_id as string)    || null) : undefined,
-      tenant_id:         body.tenant_id    !== undefined ? ((body.tenant_id as string)    || null) : undefined,
-      redirect_uri:      body.redirect_uri !== undefined ? ((body.redirect_uri as string) || null) : undefined,
-      scopes:            body.scopes       !== undefined ? ((body.scopes as string)       || null) : undefined,
-      /* LDAP fields */
-      ldap_url:          body.ldap_url          !== undefined ? ((body.ldap_url as string)          || null) : undefined,
-      ldap_bind_dn:      body.ldap_bind_dn      !== undefined ? ((body.ldap_bind_dn as string)      || null) : undefined,
-      ldap_base_dn:      body.ldap_base_dn      !== undefined ? ((body.ldap_base_dn as string)      || null) : undefined,
-      ldap_user_filter:  body.ldap_user_filter  !== undefined ? ((body.ldap_user_filter as string)  || null) : undefined,
-      ldap_group_filter: body.ldap_group_filter !== undefined ? ((body.ldap_group_filter as string) || null) : undefined,
-      ldap_tls_enabled:  typeof body.ldap_tls_enabled === "boolean" ? body.ldap_tls_enabled : undefined,
+      /* Azure AD shared */
+      client_id:          body.client_id    !== undefined ? ((body.client_id as string)    || null) : undefined,
+      tenant_id:          body.tenant_id    !== undefined ? ((body.tenant_id as string)    || null) : undefined,
+      redirect_uri:       body.redirect_uri !== undefined ? ((body.redirect_uri as string) || null) : undefined,
+      scopes:             body.scopes       !== undefined ? ((body.scopes as string)       || null) : undefined,
+      /* LDAP */
+      ldap_url:           body.ldap_url          !== undefined ? ((body.ldap_url as string)          || null) : undefined,
+      ldap_bind_dn:       body.ldap_bind_dn      !== undefined ? ((body.ldap_bind_dn as string)      || null) : undefined,
+      ldap_base_dn:       body.ldap_base_dn      !== undefined ? ((body.ldap_base_dn as string)      || null) : undefined,
+      ldap_user_filter:   body.ldap_user_filter  !== undefined ? ((body.ldap_user_filter as string)  || null) : undefined,
+      ldap_group_filter:  body.ldap_group_filter !== undefined ? ((body.ldap_group_filter as string) || null) : undefined,
+      ldap_tls_enabled:   typeof body.ldap_tls_enabled === "boolean" ? body.ldap_tls_enabled : undefined,
+      /* SAML 2.0 */
+      saml_entry_point:   body.saml_entry_point !== undefined ? ((body.saml_entry_point as string) || null) : undefined,
+      saml_issuer:        body.saml_issuer      !== undefined ? ((body.saml_issuer as string)      || null) : undefined,
+      saml_logout_url:    body.saml_logout_url  !== undefined ? ((body.saml_logout_url as string)  || null) : undefined,
+      /* OIDC */
+      oidc_issuer_url:    body.oidc_issuer_url    !== undefined ? ((body.oidc_issuer_url as string)    || null) : undefined,
+      oidc_client_id:     body.oidc_client_id     !== undefined ? ((body.oidc_client_id as string)     || null) : undefined,
+      oidc_discovery_url: body.oidc_discovery_url !== undefined ? ((body.oidc_discovery_url as string) || null) : undefined,
     };
 
     /* Only update secrets when explicitly provided and non-empty */
@@ -101,6 +120,12 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
     if (body.ldap_bind_password && typeof body.ldap_bind_password === "string" && body.ldap_bind_password.trim()) {
       updateData.ldap_bind_password = body.ldap_bind_password.trim();
+    }
+    if (body.saml_certificate && typeof body.saml_certificate === "string" && body.saml_certificate.trim()) {
+      updateData.saml_certificate = body.saml_certificate.trim();
+    }
+    if (body.oidc_client_secret && typeof body.oidc_client_secret === "string" && body.oidc_client_secret.trim()) {
+      updateData.oidc_client_secret = body.oidc_client_secret.trim();
     }
 
     if (typeof body.enabled === "boolean") {

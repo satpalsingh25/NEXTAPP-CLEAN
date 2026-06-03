@@ -34,6 +34,12 @@ interface IdentityProvider {
   ldap_user_filter:    string | null;
   ldap_group_filter:   string | null;
   ldap_tls_enabled:    boolean | null;
+  saml_entry_point:    string | null;
+  saml_issuer:         string | null;
+  saml_logout_url:     string | null;
+  oidc_issuer_url:     string | null;
+  oidc_client_id:      string | null;
+  oidc_discovery_url:  string | null;
   created_at:          string;
 }
 
@@ -68,6 +74,23 @@ interface LdapProviderForm {
   ldap_user_filter:  string;
   ldap_group_filter: string;
   ldap_tls_enabled:  boolean;
+}
+
+interface SamlProviderForm {
+  name:             string;
+  saml_entry_point: string;
+  saml_issuer:      string;
+  saml_certificate: string;
+  saml_logout_url:  string;
+}
+
+interface OidcProviderForm {
+  name:               string;
+  oidc_issuer_url:    string;
+  oidc_discovery_url: string;
+  oidc_client_id:     string;
+  oidc_client_secret: string;
+  scopes:             string;
 }
 
 interface MappingForm {
@@ -119,6 +142,23 @@ const EMPTY_LDAP_FORM: LdapProviderForm = {
   ldap_user_filter:  "(objectClass=person)",
   ldap_group_filter: "(objectClass=group)",
   ldap_tls_enabled:  false,
+};
+
+const EMPTY_SAML_FORM: SamlProviderForm = {
+  name:             "",
+  saml_entry_point: "",
+  saml_issuer:      "",
+  saml_certificate: "",
+  saml_logout_url:  "",
+};
+
+const EMPTY_OIDC_FORM: OidcProviderForm = {
+  name:               "",
+  oidc_issuer_url:    "",
+  oidc_discovery_url: "",
+  oidc_client_id:     "",
+  oidc_client_secret: "",
+  scopes:             "openid profile email",
 };
 
 const EMPTY_MAPPING_FORM: MappingForm = {
@@ -489,6 +529,349 @@ function LdapProviderModal({
   );
 }
 
+/* ── SAML Provider Modal ────────────────────────────────────────────── */
+function SamlProviderModal({
+  editProvider, onClose, onSaved,
+}: {
+  editProvider: IdentityProvider | null; onClose: () => void; onSaved: () => void;
+}) {
+  const [form, setForm] = useState<SamlProviderForm>(() =>
+    editProvider
+      ? {
+          name:             editProvider.name,
+          saml_entry_point: editProvider.saml_entry_point ?? "",
+          saml_issuer:      editProvider.saml_issuer      ?? "",
+          saml_certificate: "",   // never pre-filled — write-only
+          saml_logout_url:  editProvider.saml_logout_url  ?? "",
+        }
+      : { ...EMPTY_SAML_FORM }
+  );
+  const [saving,     setSaving]     = useState(false);
+  const [testing,    setTesting]    = useState(false);
+  const [savedId,    setSavedId]    = useState<string | null>(editProvider?.id ?? null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: string } | null>(null);
+  const [error,      setError]      = useState("");
+
+  const set = <K extends keyof SamlProviderForm>(key: K, val: SamlProviderForm[K]) =>
+    setForm((f) => ({ ...f, [key]: val }));
+
+  const handleSave = async () => {
+    setError("");
+    if (!form.name.trim())             { setError("Provider name is required."); return; }
+    if (!form.saml_entry_point.trim()) { setError("IdP Entry Point URL is required."); return; }
+    if (!form.saml_issuer.trim())      { setError("IdP Issuer (Entity ID) is required."); return; }
+    if (!editProvider && !form.saml_certificate.trim()) { setError("X.509 Certificate is required for new providers."); return; }
+
+    setSaving(true);
+    try {
+      const url    = editProvider ? `/api/protected/identity-providers/${editProvider.id}` : "/api/protected/identity-providers";
+      const method = editProvider ? "PUT" : "POST";
+      const payload: Record<string, unknown> = {
+        name:             form.name.trim(),
+        provider_type:    "SAML",
+        saml_entry_point: form.saml_entry_point.trim(),
+        saml_issuer:      form.saml_issuer.trim(),
+        saml_logout_url:  form.saml_logout_url.trim() || null,
+      };
+      if (form.saml_certificate.trim()) payload.saml_certificate = form.saml_certificate.trim();
+      const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save provider.");
+      setSavedId(data.id ?? editProvider?.id ?? null);
+      setTestResult(null);
+      onSaved();
+    } catch (e) { setError((e as Error).message); }
+    finally { setSaving(false); }
+  };
+
+  const handleTest = async () => {
+    if (!savedId) { setError("Save the provider first, then test the connection."); return; }
+    setTesting(true); setTestResult(null); setError("");
+    try {
+      const res  = await fetch("/api/protected/auth/saml/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider_id: savedId }),
+      });
+      const data = await res.json();
+      setTestResult(res.ok ? (data.data ?? data) : { success: false, message: data.error ?? "Test failed." });
+    } catch { setTestResult({ success: false, message: "Network error during test." }); }
+    finally { setTesting(false); }
+  };
+
+  const inputCls    = "mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const textareaCls = "mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-xs";
+  const labelCls    = "block text-sm font-medium text-slate-700";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-base font-semibold text-slate-800">
+            {editProvider ? "Edit SAML 2.0 Provider" : "Add SAML 2.0 Provider"}
+          </h2>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{error}</div>}
+
+          <div>
+            <label className={labelCls}>Provider Name</label>
+            <input className={inputCls} placeholder="e.g. Okta SSO" value={form.name}
+              onChange={(e) => set("name", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>IdP Entry Point URL <span className="text-red-500">*</span></label>
+            <input className={inputCls} placeholder="https://your-idp.example.com/sso/saml"
+              value={form.saml_entry_point} onChange={(e) => set("saml_entry_point", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              The SSO URL from your IdP (e.g. Okta: <em>Sign On → Identity Provider Single Sign-On URL</em>).
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Issuer / Entity ID <span className="text-red-500">*</span></label>
+            <input className={inputCls} placeholder="https://your-idp.example.com"
+              value={form.saml_issuer} onChange={(e) => set("saml_issuer", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              The IdP&apos;s entity ID (e.g. Okta: <em>Identity Provider Issuer</em>). Can be a URL or a URN.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>
+              X.509 Certificate <span className="text-red-500">*</span>
+              {editProvider && <span className="ml-1 text-xs text-slate-400">(leave blank to keep existing)</span>}
+            </label>
+            <textarea rows={6} className={textareaCls}
+              placeholder={"-----BEGIN CERTIFICATE-----\nMIIC...your IdP certificate here...\n-----END CERTIFICATE-----"}
+              value={form.saml_certificate} onChange={(e) => set("saml_certificate", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              Paste the full PEM certificate from your IdP. In Okta: <em>Sign On → SAML Signing Certificates</em>.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Logout URL <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input className={inputCls} placeholder="https://your-idp.example.com/slo/saml"
+              value={form.saml_logout_url} onChange={(e) => set("saml_logout_url", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">Single Logout URL for SP-initiated logout (optional).</p>
+          </div>
+
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-xs text-indigo-800 space-y-1.5">
+            <p className="font-semibold text-indigo-900">SP Configuration (provide to your IdP)</p>
+            <p>• <strong>ACS URL</strong> (Assertion Consumer Service): <code className="bg-indigo-100 px-1 rounded">/api/auth/saml/callback</code></p>
+            <p>• <strong>SP Entity ID / Audience</strong>: use the same value as your Issuer field above</p>
+            <p>• <strong>Name ID format</strong>: Email Address</p>
+            <p>• <strong>Attribute</strong>: map <code className="bg-indigo-100 px-1 rounded">email</code> claim</p>
+          </div>
+
+          {testResult && (
+            <div className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${testResult.success ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+              {testResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+              <div>
+                {testResult.message}
+                {testResult.details && <pre className="mt-1 text-xs opacity-70 whitespace-pre-wrap">{testResult.details}</pre>}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 gap-3">
+          <button type="button" onClick={handleTest} disabled={testing || !savedId}
+            title={!savedId ? "Save the provider first to enable connection testing." : undefined}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+            {testing ? "Testing…" : "Test Connection"}
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? "Saving…" : "Save Provider"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── OIDC Provider Modal ─────────────────────────────────────────────── */
+function OidcProviderModal({
+  editProvider, onClose, onSaved,
+}: {
+  editProvider: IdentityProvider | null; onClose: () => void; onSaved: () => void;
+}) {
+  const [form, setForm] = useState<OidcProviderForm>(() =>
+    editProvider
+      ? {
+          name:               editProvider.name,
+          oidc_issuer_url:    editProvider.oidc_issuer_url    ?? "",
+          oidc_discovery_url: editProvider.oidc_discovery_url ?? "",
+          oidc_client_id:     editProvider.oidc_client_id     ?? "",
+          oidc_client_secret: "",   // never pre-filled
+          scopes:             editProvider.scopes ?? "openid profile email",
+        }
+      : { ...EMPTY_OIDC_FORM }
+  );
+  const [saving,     setSaving]     = useState(false);
+  const [testing,    setTesting]    = useState(false);
+  const [savedId,    setSavedId]    = useState<string | null>(editProvider?.id ?? null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: string } | null>(null);
+  const [error,      setError]      = useState("");
+
+  const set = <K extends keyof OidcProviderForm>(key: K, val: OidcProviderForm[K]) =>
+    setForm((f) => ({ ...f, [key]: val }));
+
+  const handleSave = async () => {
+    setError("");
+    if (!form.name.trim())           { setError("Provider name is required."); return; }
+    if (!form.oidc_issuer_url.trim() && !form.oidc_discovery_url.trim()) { setError("Issuer URL or Discovery URL is required."); return; }
+    if (!form.oidc_client_id.trim()) { setError("Client ID is required."); return; }
+    if (!editProvider && !form.oidc_client_secret.trim()) { setError("Client Secret is required for new providers."); return; }
+
+    setSaving(true);
+    try {
+      const url    = editProvider ? `/api/protected/identity-providers/${editProvider.id}` : "/api/protected/identity-providers";
+      const method = editProvider ? "PUT" : "POST";
+      const payload: Record<string, unknown> = {
+        name:               form.name.trim(),
+        provider_type:      "OIDC",
+        oidc_issuer_url:    form.oidc_issuer_url.trim()    || null,
+        oidc_discovery_url: form.oidc_discovery_url.trim() || null,
+        oidc_client_id:     form.oidc_client_id.trim(),
+        scopes:             form.scopes.trim() || "openid profile email",
+      };
+      if (form.oidc_client_secret.trim()) payload.oidc_client_secret = form.oidc_client_secret.trim();
+      const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save provider.");
+      setSavedId(data.id ?? editProvider?.id ?? null);
+      setTestResult(null);
+      onSaved();
+    } catch (e) { setError((e as Error).message); }
+    finally { setSaving(false); }
+  };
+
+  const handleTest = async () => {
+    if (!savedId) { setError("Save the provider first, then test the connection."); return; }
+    setTesting(true); setTestResult(null); setError("");
+    try {
+      const res  = await fetch("/api/protected/auth/oidc/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider_id: savedId }),
+      });
+      const data = await res.json();
+      setTestResult(res.ok ? (data.data ?? data) : { success: false, message: data.error ?? "Test failed." });
+    } catch { setTestResult({ success: false, message: "Network error during test." }); }
+    finally { setTesting(false); }
+  };
+
+  const inputCls  = "mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const labelCls  = "block text-sm font-medium text-slate-700";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-base font-semibold text-slate-800">
+            {editProvider ? "Edit OIDC Provider" : "Add OpenID Connect Provider"}
+          </h2>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{error}</div>}
+
+          <div>
+            <label className={labelCls}>Provider Name</label>
+            <input className={inputCls} placeholder="e.g. Okta OIDC" value={form.name}
+              onChange={(e) => set("name", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Issuer URL</label>
+            <input className={inputCls} placeholder="https://your-domain.okta.com"
+              value={form.oidc_issuer_url} onChange={(e) => set("oidc_issuer_url", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              The base URL of your IdP. Used to auto-discover{" "}
+              <code className="bg-slate-100 px-1 rounded">/.well-known/openid-configuration</code>.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Discovery URL <span className="text-slate-400 font-normal">(optional override)</span></label>
+            <input className={inputCls} placeholder="https://your-domain.okta.com/.well-known/openid-configuration"
+              value={form.oidc_discovery_url} onChange={(e) => set("oidc_discovery_url", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              Override the discovery URL if your IdP uses a non-standard path.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Client ID <span className="text-red-500">*</span></label>
+            <input className={inputCls} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              value={form.oidc_client_id} onChange={(e) => set("oidc_client_id", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>
+              Client Secret <span className="text-red-500">*</span>
+              {editProvider && <span className="ml-1 text-xs text-slate-400">(leave blank to keep existing)</span>}
+            </label>
+            <input className={inputCls} type="password" autoComplete="new-password"
+              placeholder={editProvider ? "••••••••••••••••" : "Client secret from your IdP"}
+              value={form.oidc_client_secret} onChange={(e) => set("oidc_client_secret", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Scopes <span className="text-slate-400 font-normal">(space-separated)</span></label>
+            <input className={inputCls} placeholder="openid profile email"
+              value={form.scopes} onChange={(e) => set("scopes", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">
+              Standard: <code className="bg-slate-100 px-1 rounded">openid profile email</code>.
+              Some providers require additional scopes (e.g. <code className="bg-slate-100 px-1 rounded">offline_access</code>).
+            </p>
+          </div>
+
+          <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 text-xs text-sky-800 space-y-1.5">
+            <p className="font-semibold text-sky-900">IdP Configuration</p>
+            <p>• <strong>Grant type</strong>: Authorization Code</p>
+            <p>• <strong>Redirect / Callback URI</strong>: <code className="bg-sky-100 px-1 rounded">/api/auth/oidc/callback</code></p>
+            <p>• Required claims: <code className="bg-sky-100 px-1 rounded">sub</code>, <code className="bg-sky-100 px-1 rounded">email</code></p>
+          </div>
+
+          {testResult && (
+            <div className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${testResult.success ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+              {testResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+              <div>
+                {testResult.message}
+                {testResult.details && <pre className="mt-1 text-xs opacity-70 whitespace-pre-wrap">{testResult.details}</pre>}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 gap-3">
+          <button type="button" onClick={handleTest} disabled={testing || !savedId}
+            title={!savedId ? "Save the provider first to enable connection testing." : undefined}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+            {testing ? "Testing…" : "Fetch Discovery"}
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? "Saving…" : "Save Provider"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Group Mapping Modal ────────────────────────────────────────────── */
 function GroupMappingModal({
   editMapping, providers, onClose, onSaved,
@@ -661,6 +1044,14 @@ export default function AuthenticationSettingsPage() {
   const [showLdapModal,   setShowLdapModal]   = useState(false);
   const [editLdapProvider, setEditLdapProvider] = useState<IdentityProvider | null>(null);
 
+  /* SAML provider modal */
+  const [showSamlModal,  setShowSamlModal]  = useState(false);
+  const [editSamlProvider, setEditSamlProvider] = useState<IdentityProvider | null>(null);
+
+  /* OIDC provider modal */
+  const [showOidcModal,  setShowOidcModal]  = useState(false);
+  const [editOidcProvider, setEditOidcProvider] = useState<IdentityProvider | null>(null);
+
   /* Group mapping modal */
   const [showMappingModal,  setShowMappingModal]  = useState(false);
   const [editMapping,       setEditMapping]       = useState<GroupMapping | null>(null);
@@ -730,6 +1121,10 @@ export default function AuthenticationSettingsPage() {
   const handleEditProvider = (p: IdentityProvider) => {
     if (p.provider_type === "LDAP") {
       setEditLdapProvider(p); setShowLdapModal(true);
+    } else if (p.provider_type === "SAML") {
+      setEditSamlProvider(p); setShowSamlModal(true);
+    } else if (p.provider_type === "OIDC") {
+      setEditOidcProvider(p); setShowOidcModal(true);
     } else {
       setEditAzureProvider(p); setShowAzureModal(true);
     }
@@ -815,6 +1210,20 @@ export default function AuthenticationSettingsPage() {
           onSaved={() => { setShowLdapModal(false); setEditLdapProvider(null); loadAll(); }}
         />
       )}
+      {showSamlModal && (
+        <SamlProviderModal
+          editProvider={editSamlProvider}
+          onClose={() => { setShowSamlModal(false); setEditSamlProvider(null); }}
+          onSaved={() => { setShowSamlModal(false); setEditSamlProvider(null); loadAll(); }}
+        />
+      )}
+      {showOidcModal && (
+        <OidcProviderModal
+          editProvider={editOidcProvider}
+          onClose={() => { setShowOidcModal(false); setEditOidcProvider(null); }}
+          onSaved={() => { setShowOidcModal(false); setEditOidcProvider(null); loadAll(); }}
+        />
+      )}
       {showMappingModal && (
         <GroupMappingModal
           editMapping={editMapping} providers={providers}
@@ -878,8 +1287,8 @@ export default function AuthenticationSettingsPage() {
               <Toggle label="Enable Azure AD / Entra ID Login" description="Microsoft Azure Active Directory via OAuth 2.0 / OIDC."               checked={settings.allow_azure_login}  onChange={set("allow_azure_login")} />
               <Toggle label="Enable Google Workspace Login"    description="Coming soon — Google Workspace OAuth 2.0."                            checked={settings.allow_google_login} onChange={set("allow_google_login")} />
               <Toggle label="Enable LDAP / AD Login"           description="On-premise Active Directory or LDAP directory server."               checked={settings.allow_ldap_login}   onChange={set("allow_ldap_login")} />
-              <Toggle label="Enable SAML Login"                description="Coming soon — SAML 2.0 single sign-on."                              checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
-              <Toggle label="Enable OIDC Login"                description="Coming soon — OpenID Connect."                                       checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
+              <Toggle label="Enable SAML Login"                description="SAML 2.0 enterprise SSO — Okta, Auth0, Keycloak, and other IdPs."  checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
+              <Toggle label="Enable OIDC Login"                description="Generic OpenID Connect SSO — Okta, Auth0, Google Workspace, and more." checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
             </div>
           </div>
 
@@ -931,10 +1340,18 @@ export default function AuthenticationSettingsPage() {
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Identity Providers</h2>
               <p className="text-xs text-slate-500 mt-0.5">Configured external authentication providers.</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button onClick={() => { setEditLdapProvider(null); setShowLdapModal(true); }}
                 className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50">
                 <Server className="h-3.5 w-3.5" /> Add LDAP
+              </button>
+              <button onClick={() => { setEditSamlProvider(null); setShowSamlModal(true); }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 border border-indigo-300 text-indigo-700 text-xs font-medium rounded-lg hover:bg-indigo-50">
+                <Plus className="h-3.5 w-3.5" /> Add SAML
+              </button>
+              <button onClick={() => { setEditOidcProvider(null); setShowOidcModal(true); }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 border border-sky-300 text-sky-700 text-xs font-medium rounded-lg hover:bg-sky-50">
+                <Plus className="h-3.5 w-3.5" /> Add OIDC
               </button>
               <button onClick={() => { setEditAzureProvider(null); setShowAzureModal(true); }}
                 className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
@@ -967,6 +1384,10 @@ export default function AuthenticationSettingsPage() {
                       <td className="px-6 py-4 text-sm text-slate-500 font-mono">
                         {p.provider_type === "LDAP"
                           ? (p.ldap_url ? p.ldap_url.replace(/^ldaps?:\/\//, "").split(":")[0].slice(0, 24) : "—")
+                          : p.provider_type === "SAML"
+                          ? (p.saml_entry_point ? p.saml_entry_point.replace(/^https?:\/\//, "").slice(0, 24) + "…" : "—")
+                          : p.provider_type === "OIDC"
+                          ? (p.oidc_issuer_url ? p.oidc_issuer_url.replace(/^https?:\/\//, "").slice(0, 24) + "…" : "—")
                           : (p.tenant_id ? `${p.tenant_id.slice(0, 8)}…` : "—")}
                       </td>
                       <td className="px-6 py-4"><StatusBadge enabled={p.enabled} /></td>

@@ -641,6 +641,16 @@ model IdentityProvider {
   ldap_user_filter   String?
   ldap_group_filter  String?
   ldap_tls_enabled   Boolean          @default(false)
+  /* ── SAML 2.0 fields ── */
+  saml_entry_point   String?
+  saml_issuer        String?
+  saml_certificate   String?          @db.Text
+  saml_logout_url    String?
+  /* ── Generic OIDC fields ── */
+  oidc_issuer_url    String?
+  oidc_client_id     String?
+  oidc_client_secret String?
+  oidc_discovery_url String?
   created_at         DateTime         @default(now())
   updated_at         DateTime         @updatedAt
 

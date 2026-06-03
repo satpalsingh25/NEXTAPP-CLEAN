@@ -15,6 +15,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
+    "@node-saml/node-saml": "^5.1.0",
     "@prisma/client": "^6.4.1",
     "@radix-ui/react-accordion": "^1.2.4",
     "@radix-ui/react-alert-dialog": "^1.1.7",
@@ -66,6 +67,7 @@
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.4.2",
+    "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
     "ldapts": "^4.2.6",
     "lucide-react": "^0.453.0",

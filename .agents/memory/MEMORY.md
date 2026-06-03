@@ -1,1 +1,2 @@
 - [Validation + auth patterns](validation-auth-patterns.md) — validateEmail/validateRequiredString throw (don't return), requireRole is sync, checkRateLimit returns NextResponse|null
+- [SAML + OIDC library API](saml-oidc-library-api.md) — @node-saml/node-saml v4 uses `idpCert` not `cert`; `getAuthorizeUrlAsync` returns `Promise<string>`; `ValidateInResponseTo` is an enum

@@ -11,6 +11,8 @@ interface PublicBranding {
   primary_color?: string | null;
 }
 
+interface ProviderEntry { id: string; name: string }
+
 /* ── Local login form ───────────────────────────────────────────────── */
 function LocalLoginForm({
   primary,
@@ -28,71 +30,36 @@ function LocalLoginForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/auth/login", {
-        method:      "POST",
-        headers:     { "Content-Type": "application/json" },
-        credentials: "include",
-        body:        JSON.stringify({ email, password }),
+      const res  = await fetch("/api/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (res.ok) {
-        onSuccess();
-      } else {
-        setError(data.error || "Invalid email or password");
-      }
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { onSuccess(); } else { setError(data.error || "Invalid email or password"); }
+    } catch { setError("An unexpected error occurred. Please try again."); }
+    finally { setLoading(false); }
   };
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
-      {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">{error}</div>}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-          Email address
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
+        <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email address</label>
+        <input id="email" name="email" type="email" required autoComplete="email"
           className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+          value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
+        <label htmlFor="password" className="block text-sm font-medium text-slate-700">Password</label>
+        <input id="password" name="password" type="password" required autoComplete="current-password"
           className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
-      <button
-        type="submit"
-        disabled={loading}
+      <button type="submit" disabled={loading}
         className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white disabled:opacity-50 transition-colors"
-        style={{ backgroundColor: primary }}
-      >
+        style={{ backgroundColor: primary }}>
         {loading ? "Signing in…" : "Sign in"}
       </button>
     </form>
@@ -100,13 +67,7 @@ function LocalLoginForm({
 }
 
 /* ── LDAP login form ────────────────────────────────────────────────── */
-function LdapLoginForm({
-  primary,
-  onSuccess,
-}: {
-  primary: string;
-  onSuccess: () => void;
-}) {
+function LdapLoginForm({ primary, onSuccess }: { primary: string; onSuccess: () => void }) {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
@@ -114,85 +75,47 @@ function LdapLoginForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/auth/ldap/login", {
-        method:      "POST",
-        headers:     { "Content-Type": "application/json" },
-        credentials: "include",
-        body:        JSON.stringify({ email, password }),
+      const res  = await fetch("/api/auth/ldap/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (res.ok) {
-        onSuccess();
-      } else {
-        setError(data.error || "LDAP authentication failed. Check your credentials.");
-      }
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { onSuccess(); } else { setError(data.error || "LDAP authentication failed. Check your credentials."); }
+    } catch { setError("An unexpected error occurred. Please try again."); }
+    finally { setLoading(false); }
   };
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
-      {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">{error}</div>}
       <div>
-        <label htmlFor="ldap-email" className="block text-sm font-medium text-slate-700">
-          Directory email / username
-        </label>
-        <input
-          id="ldap-email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
+        <label htmlFor="ldap-email" className="block text-sm font-medium text-slate-700">Directory email / username</label>
+        <input id="ldap-email" name="email" type="email" required autoComplete="email"
           className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+          value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
       <div>
-        <label htmlFor="ldap-password" className="block text-sm font-medium text-slate-700">
-          Directory password
-        </label>
-        <input
-          id="ldap-password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
+        <label htmlFor="ldap-password" className="block text-sm font-medium text-slate-700">Directory password</label>
+        <input id="ldap-password" name="password" type="password" required autoComplete="current-password"
           className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
-      <button
-        type="submit"
-        disabled={loading}
+      <button type="submit" disabled={loading}
         className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white disabled:opacity-50 transition-colors"
-        style={{ backgroundColor: primary }}
-      >
+        style={{ backgroundColor: primary }}>
         {loading ? "Signing in…" : "Sign in with Directory"}
       </button>
     </form>
   );
 }
 
-/* ── Microsoft sign-in button ───────────────────────────────────────── */
+/* ── SSO redirect buttons ───────────────────────────────────────────── */
 function MicrosoftButton({ providerId }: { providerId: string }) {
   return (
-    <a
-      href={`/api/auth/azure/login?provider_id=${providerId}`}
-      className="w-full flex items-center justify-center gap-3 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-    >
-      {/* Microsoft logo SVG (official brand colors) */}
+    <a href={`/api/auth/azure/login?provider_id=${providerId}`}
+      className="w-full flex items-center justify-center gap-3 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors">
       <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
         <rect x="1"  y="1"  width="9" height="9" fill="#f25022" />
         <rect x="11" y="1"  width="9" height="9" fill="#7fba00" />
@@ -204,26 +127,56 @@ function MicrosoftButton({ providerId }: { providerId: string }) {
   );
 }
 
-/* ── Error messages for OAuth redirects ─────────────────────────────── */
+function SamlButton({ provider }: { provider: ProviderEntry }) {
+  return (
+    <a href={`/api/auth/saml/login?provider_id=${provider.id}`}
+      className="w-full flex items-center justify-center gap-3 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round"/>
+        <path d="M12 12m-3 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0" fill="#6366f1"/>
+      </svg>
+      Sign in with {provider.name}
+    </a>
+  );
+}
+
+function OidcButton({ provider }: { provider: ProviderEntry }) {
+  return (
+    <a href={`/api/auth/oidc/login?provider_id=${provider.id}`}
+      className="w-full flex items-center justify-center gap-3 py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" stroke="#0ea5e9" strokeWidth="2"/>
+        <path d="M12 8v4l3 3" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
+      </svg>
+      Sign in with {provider.name}
+    </a>
+  );
+}
+
+/* ── Error messages ─────────────────────────────────────────────────── */
 const OAUTH_ERRORS: Record<string, string> = {
   azure_denied:             "Microsoft sign-in was cancelled.",
   azure_auth_failed:        "Microsoft authentication failed. Please try again.",
+  saml_auth_failed:         "SAML authentication failed. Please try again.",
+  saml_not_enabled:         "SAML login is not enabled for this organisation.",
+  oidc_denied:              "Single sign-on was cancelled.",
+  oidc_auth_failed:         "OIDC authentication failed. Please try again.",
+  oidc_not_enabled:         "OIDC login is not enabled for this organisation.",
   state_mismatch:           "Security check failed. Please try again.",
-  company_mismatch:         "Your Microsoft account is not authorised for this organisation.",
+  company_mismatch:         "Your account is not authorised for this organisation.",
   auto_import_disabled:     "Your account does not exist here. Contact your administrator.",
   account_disabled:         "Your account has been disabled. Contact your administrator.",
-  provider_not_configured:  "Microsoft login is not fully configured yet.",
-  provider_unavailable:     "Microsoft login is temporarily unavailable.",
+  provider_not_configured:  "The login provider is not fully configured yet.",
+  provider_unavailable:     "The login provider is temporarily unavailable.",
   invalid_callback:         "Invalid login response. Please try again.",
+  missing_provider:         "No login provider specified.",
 };
 
 /* ── Divider ────────────────────────────────────────────────────────── */
 function Divider({ label }: { label: string }) {
   return (
     <div className="relative my-4">
-      <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-slate-200" />
-      </div>
+      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
       <div className="relative flex justify-center">
         <span className="bg-white px-2 text-xs text-slate-400">{label}</span>
       </div>
@@ -234,14 +187,15 @@ function Divider({ label }: { label: string }) {
 /* ── Main login page ────────────────────────────────────────────────── */
 export default function LoginPage() {
   const [b,           setB]           = useState<PublicBranding>({});
-  const [azureIds,    setAzureIds]    = useState<string[]>([]);
+  const [azureProviders, setAzureProviders] = useState<ProviderEntry[]>([]);
+  const [samlProviders,  setSamlProviders]  = useState<ProviderEntry[]>([]);
+  const [oidcProviders,  setOidcProviders]  = useState<ProviderEntry[]>([]);
   const [showLocal,   setShowLocal]   = useState(true);
   const [showLdap,    setShowLdap]    = useState(false);
   const [urlError,    setUrlError]    = useState("");
   const [loginMode,   setLoginMode]   = useState<"local" | "ldap">("local");
 
   useEffect(() => {
-    /* Parse error from OAuth redirect */
     const params = new URLSearchParams(window.location.search);
     const err    = params.get("error");
     if (err) setUrlError(OAUTH_ERRORS[err] ?? "Authentication failed. Please try again.");
@@ -254,26 +208,17 @@ export default function LoginPage() {
 
     /* Load enabled providers — drives which buttons/forms appear */
     fetch("/api/auth/providers")
-      .then((r) => (r.ok ? r.json() : { providers: [] }))
-      .then((data: { providers: string[] }) => {
+      .then((r) => (r.ok ? r.json() : { providers: [], byType: {} }))
+      .then((data: { providers: string[]; byType: Record<string, ProviderEntry[]> }) => {
         const types = data.providers ?? [];
+        const byType = data.byType ?? {};
         setShowLocal(types.includes("LOCAL") || types.length === 0);
         setShowLdap(types.includes("LDAP"));
+        setAzureProviders(byType["AZURE_AD"] ?? []);
+        setSamlProviders(byType["SAML"]      ?? []);
+        setOidcProviders(byType["OIDC"]      ?? []);
       })
-      .catch(() => {
-        setShowLocal(true);
-      });
-
-    /* Load provider IDs for Azure buttons and LDAP detection */
-    fetch("/api/protected/identity-providers")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((providers: { id: string; provider_type: string; enabled: boolean }[]) => {
-        const ids = providers
-          .filter((p) => p.provider_type === "AZURE_AD" && p.enabled)
-          .map((p) => p.id);
-        setAzureIds(ids);
-      })
-      .catch(() => setAzureIds([]));
+      .catch(() => { setShowLocal(true); });
   }, []);
 
   const bg = b.login_bg ?? "";
@@ -287,13 +232,13 @@ export default function LoginPage() {
   const primary = b.primary_color || "#0f172a";
   const appName = b.app_name || "Compliance & AMC";
 
-  const hasAzure = azureIds.length > 0;
-  const hasExternalProviders = hasAzure || showLdap;
+  const hasRedirectProviders = azureProviders.length > 0 || samlProviders.length > 0 || oidcProviders.length > 0;
+  const hasCredentialForms   = showLocal || showLdap;
 
-  /* When only LDAP is available (no local, no Azure), default to LDAP mode */
+  /* When only LDAP is available (no local, no redirect SSO), default to LDAP mode */
   useEffect(() => {
-    if (showLdap && !showLocal && !hasAzure) setLoginMode("ldap");
-  }, [showLdap, showLocal, hasAzure]);
+    if (showLdap && !showLocal && !hasRedirectProviders) setLoginMode("ldap");
+  }, [showLdap, showLocal, hasRedirectProviders]);
 
   const showModeSwitcher = showLocal && showLdap;
 
@@ -304,20 +249,14 @@ export default function LoginPage() {
         {/* Branding */}
         {b.login_banner ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={b.login_banner}
-            alt="Banner"
+          <img src={b.login_banner} alt="Banner"
             className="w-full max-h-32 object-contain mb-4"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
         ) : b.logo_base64 ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={b.logo_base64}
-            alt="Logo"
+          <img src={b.logo_base64} alt="Logo"
             className="h-12 mx-auto mb-4 object-contain"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
         ) : null}
 
         <div className="text-center mb-6">
@@ -325,50 +264,34 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-slate-600">Access your {appName} account</p>
         </div>
 
-        {/* OAuth error message */}
+        {/* Error message */}
         {urlError && (
-          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">
-            {urlError}
-          </div>
+          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">{urlError}</div>
         )}
 
-        {/* Azure AD / Microsoft buttons */}
-        {hasAzure && (
+        {/* SSO redirect buttons */}
+        {hasRedirectProviders && (
           <div className="space-y-2 mb-4">
-            {azureIds.map((id) => (
-              <MicrosoftButton key={id} providerId={id} />
-            ))}
+            {azureProviders.map((p) => <MicrosoftButton key={p.id} providerId={p.id} />)}
+            {samlProviders.map((p)  => <SamlButton      key={p.id} provider={p} />)}
+            {oidcProviders.map((p)  => <OidcButton       key={p.id} provider={p} />)}
           </div>
         )}
 
         {/* Divider between SSO buttons and credential forms */}
-        {hasExternalProviders && (showLocal || showLdap) && (
+        {hasRedirectProviders && hasCredentialForms && (
           <Divider label="or continue with email" />
         )}
 
         {/* Login mode switcher — shown when both local and LDAP are available */}
         {showModeSwitcher && (
           <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-5">
-            <button
-              type="button"
-              onClick={() => setLoginMode("local")}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                loginMode === "local"
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
+            <button type="button" onClick={() => setLoginMode("local")}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${loginMode === "local" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
               Password
             </button>
-            <button
-              type="button"
-              onClick={() => setLoginMode("ldap")}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                loginMode === "ldap"
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
+            <button type="button" onClick={() => setLoginMode("ldap")}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${loginMode === "ldap" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
               Directory (LDAP)
             </button>
           </div>
@@ -376,25 +299,18 @@ export default function LoginPage() {
 
         {/* Local login form */}
         {showLocal && (!showModeSwitcher || loginMode === "local") && (
-          <LocalLoginForm
-            primary={primary}
-            errorFromUrl=""
-            onSuccess={() => { window.location.href = "/dashboard"; }}
-          />
+          <LocalLoginForm primary={primary} errorFromUrl=""
+            onSuccess={() => { window.location.href = "/dashboard"; }} />
         )}
 
         {/* LDAP login form */}
         {showLdap && (!showModeSwitcher || loginMode === "ldap") && (
-          <LdapLoginForm
-            primary={primary}
-            onSuccess={() => { window.location.href = "/dashboard"; }}
-          />
+          <LdapLoginForm primary={primary}
+            onSuccess={() => { window.location.href = "/dashboard"; }} />
         )}
 
         {b.login_footer && (
-          <p className="mt-6 text-center text-xs text-slate-500 whitespace-pre-line">
-            {b.login_footer}
-          </p>
+          <p className="mt-6 text-center text-xs text-slate-500 whitespace-pre-line">{b.login_footer}</p>
         )}
       </div>
     </div>
