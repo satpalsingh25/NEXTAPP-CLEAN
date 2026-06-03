@@ -1,0 +1,326 @@
+# 🚀 Phase 12 — Step 3
+
+# Google Drive Storage Provider Integration
+
+## Replit Optimized Prompt
+
+```text id="p12step3prompt"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 12 Step 1 → Storage provider architecture
+- Phase 12 Step 2 → SharePoint provider refactor
+
+Current system:
+- DMS uploads work
+- AMC uploads work
+- Compliance uploads work
+- SharePoint provider works through unified storage service
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Implement Google Drive as a fully supported enterprise storage provider.
+
+Requirements:
+- Support Google Drive
+- Support Shared Drives
+- Use unified storage architecture
+- Integrate with:
+  - DMS
+  - AMC
+  - Compliance
+
+Must preserve:
+- Existing upload flows
+- Existing folder structures
+- Existing previews/downloads
+
+====================================================
+1. INSTALL REQUIRED PACKAGES
+====================================================
+
+Install stable Google APIs packages compatible with current Next.js version.
+
+Requirements:
+- Google OAuth support
+- Google Drive API
+- Shared Drive support
+
+====================================================
+2. IMPLEMENT GOOGLE DRIVE PROVIDER
+====================================================
+
+Implement:
+
+/lib/storage/providers/google-drive-provider.ts
+
+Must implement:
+
+StorageProviderInterface
+
+====================================================
+3. IMPLEMENT REQUIRED METHODS
+====================================================
+
+Implement:
+
+- uploadFile()
+- downloadFile()
+- deleteFile()
+- createFolder()
+- renameFile()
+- renameFolder()
+- generatePreviewUrl()
+- generateDownloadUrl()
+- testConnection()
+
+====================================================
+4. GOOGLE DRIVE CONFIGURATION
+====================================================
+
+Extend StorageProvider configuration support.
+
+Store:
+
+- client_id
+- client_secret
+- refresh_token
+- drive_id
+- root_folder_id
+
+inside:
+configuration_json
+
+====================================================
+5. GOOGLE DRIVE ADMIN UI
+====================================================
+
+Enhance provider modal.
+
+When provider type = GOOGLE_DRIVE
+
+Show fields:
+
+- Client ID
+- Client Secret
+- Refresh Token
+- Drive ID
+- Root Folder ID
+- Use Shared Drive toggle
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+6. GOOGLE OAUTH FLOW
+====================================================
+
+Create OAuth flow for Google Drive authorization.
+
+Routes:
+
+/api/protected/storage/google/connect
+/api/protected/storage/google/callback
+
+Flow:
+- Admin authorizes Google account
+- System stores refresh token securely
+- Storage provider linked to company
+
+====================================================
+7. SHARED DRIVE SUPPORT
+====================================================
+
+Requirements:
+- Support Shared Drives
+- Support My Drive
+- Detect drive type automatically
+- Maintain permissions correctly
+
+====================================================
+8. FOLDER STRUCTURE SUPPORT
+====================================================
+
+Preserve existing enterprise folder structure.
+
+Examples:
+
+Compliance/
+AMC/
+DMS/
+
+Project folders
+Department folders
+Year folders
+
+Requirements:
+- same hierarchy behavior as SharePoint
+- auto folder creation
+
+====================================================
+9. STORAGE SERVICE INTEGRATION
+====================================================
+
+Update:
+
+storage-service.ts
+
+Requirements:
+- route Google uploads correctly
+- provider-based resolution
+- no SharePoint assumptions
+
+====================================================
+10. DMS INTEGRATION
+====================================================
+
+DMS uploads must support:
+
+- Google Drive upload
+- Preview
+- Download
+- Rename
+- Drag/drop upload
+- Bulk download
+
+====================================================
+11. COMPLIANCE INTEGRATION
+====================================================
+
+Compliance uploads must support:
+
+- Google Drive upload
+- Folder structure
+- Preview/download
+- Existing workflows
+
+====================================================
+12. AMC INTEGRATION
+====================================================
+
+AMC uploads must support:
+
+- Google Drive upload
+- Existing folder logic
+- Existing workflows
+
+====================================================
+13. DOCUMENT METADATA
+====================================================
+
+Store:
+
+- storage_provider_id
+- external_file_id
+- external_path
+
+for Google Drive uploads.
+
+====================================================
+14. GOOGLE FILE PREVIEW
+====================================================
+
+Implement:
+- preview URLs
+- secure download URLs
+
+Requirements:
+- inline preview support
+- PDF preview support
+- image preview support
+
+====================================================
+15. TEST CONNECTION
+====================================================
+
+Implement:
+
+testConnection()
+
+Validate:
+- OAuth token
+- Drive access
+- Folder access
+- Shared Drive access
+
+====================================================
+16. SECURITY REQUIREMENTS
+====================================================
+
+Requirements:
+- secure refresh token storage
+- no frontend secret exposure
+- validate company ownership
+- validate provider ownership
+
+Prevent:
+- cross-company access
+- invalid drive usage
+
+====================================================
+17. AUDIT LOGGING
+====================================================
+
+Log:
+- provider connections
+- uploads
+- downloads
+- deletes
+- rename actions
+- OAuth authorization
+
+Use existing audit system.
+
+====================================================
+18. PERFORMANCE REQUIREMENTS
+====================================================
+
+Requirements:
+- optimize Drive API calls
+- avoid duplicate folder creation
+- cache metadata when possible
+- support large file uploads
+
+====================================================
+19. IMPORTANT RULES
+====================================================
+
+- DO NOT break SharePoint provider
+- DO NOT change existing upload flows
+- DO NOT migrate existing files
+- DO NOT implement AWS S3 yet
+- DO NOT implement Azure Blob yet
+
+====================================================
+20. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- SharePoint still works
+- Google Drive works
+- DMS uploads work
+- Compliance uploads work
+- AMC uploads work
+- Preview/download works
+- No TS errors
+- App boots cleanly
+
+====================================================
+21. OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- APIs added
+- OAuth flow summary
+- Google setup steps
+- Required Google API scopes
+- Shared Drive requirements
+- Any manual setup needed
+```

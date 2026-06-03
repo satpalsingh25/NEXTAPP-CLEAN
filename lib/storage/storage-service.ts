@@ -3,6 +3,7 @@ import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import type { StorageProviderConfig, StorageProviderKind, TestConnectionResult } from "./types";
 import { getStorageProvider }  from "./factory";
 import { SharePointStorageProvider } from "./providers/sharepoint-provider";
+import { GoogleDriveStorageProvider } from "./providers/google-drive-provider";
 
 /* ── resolveCompanyStorageProvider ──────────────────────────────────── */
 export async function resolveCompanyStorageProvider(
@@ -51,22 +52,16 @@ export async function validateProviderOwnership(
 export async function resolveSharePointProvider(
   companyId: string,
 ): Promise<StorageProviderConfig | null> {
-  /* 1. Look for an existing SHAREPOINT entry */
   const existing = await prisma.storageProvider.findFirst({
     where:   { company_id: companyId, provider_type: "SHAREPOINT", enabled: true },
     orderBy: { is_default: "desc" },
   });
   if (existing) return toConfig(existing);
 
-  /* 2. Auto-migrate from SharePointConfig if configured */
   return ensureSharePointProviderRegistered(companyId);
 }
 
 /* ── getSharePointProviderId ────────────────────────────────────────── */
-/**
- * Returns just the ID of the SHAREPOINT provider (for FK storage on Document),
- * creating the provider entry if needed.
- */
 export async function getSharePointProviderId(
   companyId: string,
 ): Promise<string | null> {
@@ -75,22 +70,15 @@ export async function getSharePointProviderId(
 }
 
 /* ── ensureSharePointProviderRegistered ─────────────────────────────── */
-/**
- * If a SharePointConfig row exists for the company but no StorageProvider entry
- * of type SHAREPOINT, auto-creates one as a registry entry (credentials stay
- * in the existing SharePointConfig table — never duplicated here).
- */
 export async function ensureSharePointProviderRegistered(
   companyId: string,
 ): Promise<StorageProviderConfig | null> {
-  /* Check for existing SharePointConfig */
   const spConfig = await prisma.sharePointConfig.findUnique({
     where:  { company_id: companyId },
     select: { id: true, site_url: true },
   });
-  if (!spConfig) return null; // SharePoint not configured at all
+  if (!spConfig) return null;
 
-  /* Already has a StorageProvider entry? */
   const alreadyExists = await prisma.storageProvider.findFirst({
     where:  { company_id: companyId, provider_type: "SHAREPOINT" },
     select: { id: true },
@@ -100,7 +88,6 @@ export async function ensureSharePointProviderRegistered(
     orderBy: { is_default: "desc" },
   }) ?? alreadyExists as never);
 
-  /* Auto-create */
   const created = await prisma.storageProvider.create({
     data: {
       company_id:          companyId,
@@ -117,7 +104,7 @@ export async function ensureSharePointProviderRegistered(
 
   await prisma.auditLog.create({
     data: {
-      company_id:  companyId,
+      company_id,
       action:      "STORAGE_PROVIDER_AUTO_CREATE",
       module:      "STORAGE",
       entity_type: "StorageProvider",
@@ -130,10 +117,6 @@ export async function ensureSharePointProviderRegistered(
 }
 
 /* ── getSharePointProviderInstance ──────────────────────────────────── */
-/**
- * Returns a ready-to-use SharePointStorageProvider for the given company.
- * Returns null if SharePoint is not configured for this company.
- */
 export async function getSharePointProviderInstance(
   companyId: string,
 ): Promise<SharePointStorageProvider | null> {
@@ -144,11 +127,9 @@ export async function getSharePointProviderInstance(
 
 /* ── uploadDmsFile ──────────────────────────────────────────────────── */
 /**
- * Uploads a single file to SharePoint via the provider interface.
- * Used by the DMS upload route so it goes through the storage abstraction.
- *
- * Returns the SharePoint item ID, web URL, drive ID, and full logical path
- * — all the fields the DmsDocument creation needs.
+ * Uploads a file via the company's default storage provider.
+ * Routes to Google Drive or SharePoint depending on what is configured.
+ * Returns the fields needed to create a DmsDocument record.
  */
 export async function uploadDmsFile(params: {
   companyId:  string;
@@ -156,14 +137,43 @@ export async function uploadDmsFile(params: {
   fileName:   string;
   file:       File;
 }): Promise<{
-  fileId:   string;
-  webUrl:   string;
-  driveId:  string;
-  filePath: string;
+  fileId:               string;
+  webUrl:               string;
+  driveId:              string;   // Graph drive ID (SP) or Shared Drive ID (GD)
+  filePath:             string;
+  storage_provider_id:  string | null;
 }> {
   const { companyId, folderPath, fileName, file } = params;
 
-  /* Resolve SharePoint token + drive in parallel */
+  /* ── Check if a non-SharePoint default provider is configured ──── */
+  const defaultProvider = await getDefaultStorageProvider(companyId);
+
+  if (defaultProvider?.provider_type === "GOOGLE_DRIVE") {
+    const provider = new GoogleDriveStorageProvider(defaultProvider);
+    const buffer   = Buffer.from(await file.arrayBuffer());
+    const result   = await provider.uploadFile({
+      buffer,
+      fileName,
+      mimeType:   file.type || "application/octet-stream",
+      folderPath,
+      companyId,
+    });
+
+    const cfg           = (defaultProvider.configuration_json ?? {}) as Record<string, unknown>;
+    const sharedDriveId = cfg.use_shared_drive && cfg.drive_id
+      ? String(cfg.drive_id)
+      : "";
+
+    return {
+      fileId:              result.fileId,
+      webUrl:              result.webUrl ?? "",
+      driveId:             sharedDriveId,
+      filePath:            result.filePath,
+      storage_provider_id: defaultProvider.id,
+    };
+  }
+
+  /* ── Fallback: SharePoint (existing logic) ──────────────────────── */
   const [driveId, token] = await Promise.all([
     getDriveId(companyId),
     getSharePointToken(companyId),
@@ -191,13 +201,79 @@ export async function uploadDmsFile(params: {
     );
   }
 
-  const spFile = await spRes.json() as { id?: string; webUrl?: string };
+  const spFile       = await spRes.json() as { id?: string; webUrl?: string };
+  const spProviderId = await getSharePointProviderId(companyId).catch(() => null);
+
   return {
-    fileId:   spFile.id   ?? "",
-    webUrl:   spFile.webUrl ?? uploadUrl,
+    fileId:              spFile.id   ?? "",
+    webUrl:              spFile.webUrl ?? uploadUrl,
     driveId,
-    filePath: `/${cleanPath}/${fileName}`,
+    filePath:            `/${cleanPath}/${fileName}`,
+    storage_provider_id: spProviderId,
   };
+}
+
+/* ── downloadFileFromProvider ───────────────────────────────────────── */
+/**
+ * Downloads a file via a non-SharePoint storage provider.
+ * Returns null if the provider is SharePoint or not set
+ * (callers should fall through to their existing SharePoint logic).
+ *
+ * Accepts either `sharepoint_item_id` (DmsDocument) or
+ * `external_file_id` (Document / Compliance / AMC) as the file ID.
+ */
+export async function downloadFileFromProvider(
+  companyId:   string,
+  doc: {
+    storage_provider_id?: string | null;
+    sharepoint_item_id?:  string | null;  // DmsDocument field
+    external_file_id?:    string | null;  // Document (Compliance/AMC) field
+  },
+  filePath?: string,
+): Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null> {
+  if (!doc.storage_provider_id) return null;
+
+  const config = await resolveCompanyStorageProvider(
+    companyId, doc.storage_provider_id,
+  ).catch(() => null);
+  if (!config || config.provider_type === "SHAREPOINT") return null;
+
+  const fileId   = doc.sharepoint_item_id ?? doc.external_file_id ?? "";
+  const provider = getStorageProvider(config);
+  return provider.downloadFile(fileId, filePath);
+}
+
+/* ── deleteFileFromProvider ─────────────────────────────────────────── */
+/**
+ * Deletes a file via a non-SharePoint storage provider (best-effort).
+ * Returns true if deletion was attempted, false if caller should use SharePoint.
+ *
+ * Accepts either `sharepoint_item_id` (DmsDocument) or
+ * `external_file_id` (Document / Compliance / AMC) as the file ID.
+ */
+export async function deleteFileFromProvider(
+  companyId: string,
+  doc: {
+    storage_provider_id?: string | null;
+    sharepoint_item_id?:  string | null;
+    external_file_id?:    string | null;
+  },
+): Promise<boolean> {
+  if (!doc.storage_provider_id) return false;
+
+  const config = await resolveCompanyStorageProvider(
+    companyId, doc.storage_provider_id,
+  ).catch(() => null);
+  if (!config || config.provider_type === "SHAREPOINT") return false;
+
+  const fileId = doc.sharepoint_item_id ?? doc.external_file_id ?? "";
+  try {
+    const provider = getStorageProvider(config);
+    await provider.deleteFile(fileId);
+  } catch (err) {
+    console.error("[storage-service] deleteFileFromProvider error (non-blocking):", err);
+  }
+  return true;
 }
 
 /* ── testProviderConnection ─────────────────────────────────────────── */
@@ -216,7 +292,7 @@ export async function testProviderConnection(
   return provider.testConnection();
 }
 
-/* ── internal helper ────────────────────────────────────────────────── */
+/* ── internal helpers ───────────────────────────────────────────────── */
 function toConfig(
   p: {
     id: string; name: string; provider_type: string;
@@ -225,13 +301,13 @@ function toConfig(
   },
 ): StorageProviderConfig {
   return {
-    id:                 p.id,
-    name:               p.name,
-    provider_type:      p.provider_type as StorageProviderKind,
-    configuration_json: p.configuration_json as Record<string, unknown> | null,
+    id:                  p.id,
+    name:                p.name,
+    provider_type:       p.provider_type as StorageProviderKind,
+    configuration_json:  p.configuration_json as Record<string, unknown> | null,
     provider_identifier: p.provider_identifier,
-    enabled:            p.enabled,
-    is_default:         p.is_default,
-    company_id:         p.company_id,
+    enabled:             p.enabled,
+    is_default:          p.is_default,
+    company_id:          p.company_id,
   };
 }

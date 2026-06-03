@@ -5,6 +5,7 @@ import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess } from "@/lib/dms-permission";
 import { gateModule } from "@/lib/module-access";
 import { logAudit } from "@/lib/audit-log";
+import { downloadFileFromProvider, deleteFileFromProvider } from "@/lib/storage/storage-service";
 
 /* ------------------------------------------------------------------ */
 /* GET /api/dms/file?file_id=<uuid>[&download=true]                    */
@@ -36,7 +37,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }
 
-  /* 2. Resolve drive_id + access token in parallel ----------------- */
+  /* 2a. Fast path: non-SharePoint provider (e.g. Google Drive) ----- */
+  if (doc.storage_provider_id) {
+    const provResult = await downloadFileFromProvider(
+      company_id,
+      { storage_provider_id: doc.storage_provider_id, sharepoint_item_id: doc.sharepoint_item_id },
+      `${doc.folder_path}/${doc.name}`,
+    ).catch(() => null);
+
+    if (provResult) {
+      const disposition = download
+        ? `attachment; filename="${doc.name}"`
+        : `inline; filename="${doc.name}"`;
+      if (download) {
+        void logAudit({ company_id, user_id: auth.user.user_id, action: "DOWNLOAD_FILE", module: "DMS", entity_type: "file", entity_id: doc.id, description: `Downloaded ${doc.name}` });
+      }
+      return new NextResponse(provResult.buffer, {
+        status: 200,
+        headers: {
+          "Content-Type":        provResult.mimeType,
+          "Content-Disposition": disposition,
+          "Cache-Control":       "private, no-store",
+        },
+      });
+    }
+  }
+
+  /* 2b. Resolve SharePoint credentials ----------------------------- */
   let drive_id:    string;
   let accessToken: string;
   try {
@@ -169,8 +196,13 @@ export async function DELETE(req: NextRequest) {
     }
   }
 
-  /* 3. Best-effort delete from SharePoint --------------------------- */
-  if (doc.drive_id && doc.sharepoint_item_id) {
+  /* 3. Best-effort delete from storage provider or SharePoint ------- */
+  const deletedViaProvider = await deleteFileFromProvider(company_id, {
+    storage_provider_id: doc.storage_provider_id,
+    sharepoint_item_id:  doc.sharepoint_item_id,
+  }).catch(() => false);
+
+  if (!deletedViaProvider && doc.drive_id && doc.sharepoint_item_id) {
     try {
       const accessToken = await getSharePointToken(company_id);
       const spRes = await fetch(

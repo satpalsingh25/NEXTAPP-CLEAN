@@ -4,6 +4,7 @@ import { requireAuth }              from "@/lib/auth.server";
 import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { checkFolderAccess }        from "@/lib/dms-permission";
 import { gateModule } from "@/lib/module-access";
+import { downloadFileFromProvider } from "@/lib/storage/storage-service";
 
 /* ------------------------------------------------------------------ */
 /* MIME type map — used as fallback when SharePoint omits Content-Type  */
@@ -76,7 +77,27 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  /* 3. Resolve SharePoint credentials ------------------------------- */
+  /* 3a. Fast path: non-SharePoint provider (e.g. Google Drive) ------ */
+  if (doc.storage_provider_id) {
+    const provResult = await downloadFileFromProvider(
+      company_id,
+      { storage_provider_id: doc.storage_provider_id, sharepoint_item_id: doc.sharepoint_item_id },
+      `${doc.folder_path}/${doc.name}`,
+    ).catch(() => null);
+
+    if (provResult) {
+      return new NextResponse(provResult.buffer, {
+        status: 200,
+        headers: {
+          "Content-Type":        provResult.mimeType,
+          "Content-Disposition": `inline; filename="${doc.name}"`,
+          "Cache-Control":       "private, no-store",
+        },
+      });
+    }
+  }
+
+  /* 3b. Resolve SharePoint credentials ------------------------------ */
   let drive_id: string;
   let accessToken: string;
   try {

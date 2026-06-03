@@ -138,12 +138,13 @@ export async function POST(req: NextRequest) {
     const doc = await prisma.dmsDocument.create({
       data: {
         company_id,
-        name:               filename,
-        file_url:           uploadResult.webUrl,
-        folder_path:        folderPath,
-        uploaded_by:        user_id,
-        sharepoint_item_id: uploadResult.fileId || null,
-        drive_id:           uploadResult.driveId,
+        name:                filename,
+        file_url:            uploadResult.webUrl,
+        folder_path:         folderPath,
+        uploaded_by:         user_id,
+        sharepoint_item_id:  uploadResult.fileId || null,
+        drive_id:            uploadResult.driveId,
+        storage_provider_id: uploadResult.storage_provider_id ?? null,
       },
     });
 

@@ -7,6 +7,7 @@ import { getDriveId, getSharePointToken } from "@/lib/sharepoint-check";
 import { logAudit }                from "@/lib/audit-log";
 import { checkRateLimit }          from "@/lib/rate-limit";
 import { validateUUID, ValidationError } from "@/lib/validation";
+import { downloadFileFromProvider } from "@/lib/storage/storage-service";
 import path                        from "path";
 
 /* ------------------------------------------------------------------ */
@@ -82,7 +83,35 @@ export async function GET(
   const filename   = path.basename(doc.file_path);
   const folderPath = path.dirname(doc.file_path).replace(/^\/+|\/+$/g, "");
 
-  /* 4. Resolve SharePoint credentials ------------------------------- */
+  /* 4a. Fast path: non-SharePoint provider (e.g. Google Drive) ------- */
+  if (doc.storage_provider_id) {
+    const provResult = await downloadFileFromProvider(
+      company_id,
+      { storage_provider_id: doc.storage_provider_id, external_file_id: doc.external_file_id },
+      doc.file_path,
+    ).catch(() => null);
+
+    if (provResult) {
+      void logAudit({
+        company_id, user_id,
+        action:      "DOWNLOAD_FILE",
+        module:      doc.module,
+        entity_type: "document",
+        entity_id:   doc.id,
+        description: `Downloaded ${filename}`,
+      });
+      return new NextResponse(provResult.buffer, {
+        status: 200,
+        headers: {
+          "Content-Type":        provResult.mimeType,
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control":       "private, no-store",
+        },
+      });
+    }
+  }
+
+  /* 4b. Resolve SharePoint credentials ------------------------------ */
   let drive_id: string;
   let accessToken: string;
   try {

@@ -63,7 +63,7 @@ const PROVIDER_META: Record<ProviderType, { label: string; icon: React.ReactNode
   },
 };
 
-const IMPLEMENTED = new Set<ProviderType>(["SHAREPOINT"]);
+const IMPLEMENTED = new Set<ProviderType>(["SHAREPOINT", "GOOGLE_DRIVE"]);
 
 /* ── Add / Edit Modal ───────────────────────────────────────────────── */
 interface ProviderModalProps {
@@ -73,12 +73,32 @@ interface ProviderModalProps {
 }
 
 function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
-  const [name,              setName]             = useState(editProvider?.name ?? "");
-  const [providerType,      setProviderType]      = useState<ProviderType>(editProvider?.provider_type ?? "SHAREPOINT");
-  const [providerIdentifier,setProviderIdentifier]= useState(editProvider?.provider_identifier ?? "");
-  const [isDefault,         setIsDefault]         = useState(editProvider?.is_default ?? false);
-  const [saving,            setSaving]            = useState(false);
-  const [error,             setError]             = useState("");
+  const [name,               setName]              = useState(editProvider?.name ?? "");
+  const [providerType,       setProviderType]       = useState<ProviderType>(editProvider?.provider_type ?? "SHAREPOINT");
+  const [providerIdentifier, setProviderIdentifier] = useState(editProvider?.provider_identifier ?? "");
+  const [isDefault,          setIsDefault]          = useState(editProvider?.is_default ?? false);
+  const [saving,             setSaving]             = useState(false);
+  const [error,              setError]              = useState("");
+
+  /* ── Google Drive state ─────────────────────────────────────────── */
+  const [gdClientId,        setGdClientId]        = useState("");
+  const [gdClientSecret,    setGdClientSecret]    = useState("");   // plain; only sent if entered
+  const [gdDriveId,         setGdDriveId]         = useState("");
+  const [gdRootFolderId,    setGdRootFolderId]    = useState("");
+  const [gdUseSharedDrive,  setGdUseSharedDrive]  = useState(false);
+  const [gdConnected,       setGdConnected]       = useState(false);
+  const [gdConnecting,      setGdConnecting]      = useState(false);
+
+  useEffect(() => {
+    if (editProvider?.provider_type === "GOOGLE_DRIVE" && editProvider.configuration_json) {
+      const cfg = editProvider.configuration_json as Record<string, unknown>;
+      setGdClientId(String(cfg.client_id      ?? ""));
+      setGdDriveId(String(cfg.drive_id        ?? ""));
+      setGdRootFolderId(String(cfg.root_folder_id ?? ""));
+      setGdUseSharedDrive(Boolean(cfg.use_shared_drive));
+      setGdConnected(!!(cfg as Record<string, unknown>).has_refresh_token);
+    }
+  }, [editProvider]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,15 +112,28 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
         : "/api/protected/storage/providers";
       const method = editProvider ? "PUT" : "POST";
 
-      const res = await fetch(url, {
+      const body: Record<string, unknown> = {
+        name:                name.trim(),
+        provider_type:       providerType,
+        provider_identifier: providerIdentifier.trim() || null,
+        is_default:          isDefault,
+      };
+
+      if (providerType === "GOOGLE_DRIVE") {
+        const gdConfig: Record<string, unknown> = {
+          client_id:        gdClientId,
+          drive_id:         gdDriveId         || null,
+          root_folder_id:   gdRootFolderId    || null,
+          use_shared_drive: gdUseSharedDrive,
+        };
+        if (gdClientSecret) gdConfig.client_secret = gdClientSecret;
+        body.configuration_json = gdConfig;
+      }
+
+      const res  = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          provider_type: providerType,
-          provider_identifier: providerIdentifier.trim() || null,
-          is_default: isDefault,
-        }),
+        body:    JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Save failed."); return; }
@@ -112,11 +145,44 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
     }
   };
 
+  /* ── Save credentials then redirect to Google OAuth ─────────────── */
+  const handleGDConnect = async () => {
+    if (!editProvider) return;
+    setError("");
+    setGdConnecting(true);
+    try {
+      const gdConfig: Record<string, unknown> = {
+        client_id:        gdClientId,
+        drive_id:         gdDriveId      || null,
+        root_folder_id:   gdRootFolderId || null,
+        use_shared_drive: gdUseSharedDrive,
+      };
+      if (gdClientSecret) gdConfig.client_secret = gdClientSecret;
+
+      const saveRes = await fetch(`/api/protected/storage/providers/${editProvider.id}`, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ configuration_json: gdConfig }),
+      });
+      if (!saveRes.ok) {
+        const d = await saveRes.json();
+        setError(d.error ?? "Failed to save credentials. Please try again.");
+        setGdConnecting(false);
+        return;
+      }
+      window.location.href =
+        `/api/protected/storage/google/connect?provider_id=${editProvider.id}`;
+    } catch {
+      setError("Network error. Please try again.");
+      setGdConnecting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl z-10">
           <h2 className="text-base font-semibold text-slate-800">
             {editProvider ? "Edit Storage Provider" : "Add Storage Provider"}
           </h2>
@@ -180,10 +246,10 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
               value={providerIdentifier}
               onChange={(e) => setProviderIdentifier(e.target.value)}
               placeholder={
-                providerType === "SHAREPOINT" ? "e.g. tenant-name.sharepoint.com"
-                : providerType === "AWS_S3"   ? "e.g. my-bucket-name"
-                : providerType === "AZURE_BLOB" ? "e.g. mystorageaccount"
-                : "e.g. shared-drive-id"
+                providerType === "SHAREPOINT"  ? "e.g. tenant-name.sharepoint.com"
+                : providerType === "AWS_S3"    ? "e.g. my-bucket-name"
+                : providerType === "AZURE_BLOB"? "e.g. mystorageaccount"
+                : "e.g. optional label"
               }
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -200,7 +266,7 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
             <span className="text-sm text-slate-700">Set as default provider</span>
           </label>
 
-          {/* SharePoint-specific: credentials live in SharePoint Settings */}
+          {/* ── SharePoint credentials info ──────────────────────────── */}
           {providerType === "SHAREPOINT" && (
             <div className="bg-[#0078d4]/5 border border-[#0078d4]/20 rounded-xl px-4 py-3 space-y-2">
               <div className="flex items-center gap-2 text-[#0078d4]">
@@ -212,22 +278,128 @@ function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
                 managed in <strong>SharePoint Settings</strong> and are encrypted at rest.
               </p>
               {editProvider?.configuration_json &&
-                typeof editProvider.configuration_json === "object" &&
                 !!(editProvider.configuration_json as Record<string, unknown>).site_url_preview && (
                   <p className="text-xs text-slate-500 font-mono truncate">
                     Site: {String((editProvider.configuration_json as Record<string, unknown>).site_url_preview)}
                   </p>
               )}
-              <Link
-                href="/admin/sharepoint"
-                className="inline-flex items-center gap-1 text-xs text-[#0078d4] hover:underline font-medium"
-              >
+              <Link href="/admin/sharepoint"
+                className="inline-flex items-center gap-1 text-xs text-[#0078d4] hover:underline font-medium">
                 Configure SharePoint Credentials <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           )}
 
-          {!IMPLEMENTED.has(providerType) && providerType !== "SHAREPOINT" && (
+          {/* ── Google Drive configuration ───────────────────────────── */}
+          {providerType === "GOOGLE_DRIVE" && (
+            <div className="bg-[#1a73e8]/5 border border-[#1a73e8]/20 rounded-xl px-4 py-4 space-y-3">
+              <div className="flex items-center gap-2 text-[#1a73e8]">
+                <Info className="h-4 w-4 shrink-0" />
+                <p className="text-xs font-semibold">Google Drive OAuth Credentials</p>
+              </div>
+              <p className="text-xs text-slate-500">
+                Create a project in <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer"
+                  className="underline">Google Cloud Console</a>, enable the Drive API, create an OAuth 2.0 Client ID
+                (Web application), and paste the credentials below.
+              </p>
+
+              {/* Client ID */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Client ID</label>
+                <input
+                  value={gdClientId}
+                  onChange={(e) => setGdClientId(e.target.value)}
+                  placeholder="e.g. 1234567890-abc.apps.googleusercontent.com"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                />
+              </div>
+
+              {/* Client Secret */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Client Secret{editProvider && <span className="text-slate-400 font-normal"> (leave blank to keep current)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={gdClientSecret}
+                  onChange={(e) => setGdClientSecret(e.target.value)}
+                  placeholder={editProvider ? "••••••••" : "Paste your client secret"}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                />
+              </div>
+
+              {/* Shared Drive toggle */}
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  onClick={() => setGdUseSharedDrive((v) => !v)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${gdUseSharedDrive ? "bg-[#1a73e8]" : "bg-slate-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${gdUseSharedDrive ? "left-4" : "left-0.5"}`} />
+                </div>
+                <span className="text-xs text-slate-700">Use a Shared Drive</span>
+              </label>
+
+              {/* Shared Drive ID */}
+              {gdUseSharedDrive && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Shared Drive ID</label>
+                  <input
+                    value={gdDriveId}
+                    onChange={(e) => setGdDriveId(e.target.value)}
+                    placeholder="e.g. 0ANxxxxxxxxxx"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                  />
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    Found in the Drive URL: drive.google.com/drive/u/0/folders/<em>DRIVE_ID</em>
+                  </p>
+                </div>
+              )}
+
+              {/* Root folder ID */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Root Folder ID <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  value={gdRootFolderId}
+                  onChange={(e) => setGdRootFolderId(e.target.value)}
+                  placeholder="Leave blank to upload to My Drive / Shared Drive root"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                />
+              </div>
+
+              {/* Google Account connect button — only for existing providers */}
+              {editProvider && (
+                <div className="mt-1 pt-3 border-t border-[#1a73e8]/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-slate-700">Google Account</p>
+                      {gdConnected
+                        ? <p className="text-xs text-green-600 mt-0.5">✓ Connected (refresh token stored)</p>
+                        : <p className="text-xs text-amber-600 mt-0.5">Not yet connected — click to authorise</p>
+                      }
+                    </div>
+                    <button
+                      type="button"
+                      disabled={gdConnecting || !gdClientId}
+                      onClick={handleGDConnect}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg bg-[#1a73e8] text-white hover:bg-[#1558b0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      {gdConnecting
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <ExternalLink className="h-3.5 w-3.5" />}
+                      {gdConnected ? "Reconnect" : "Connect Google Account"}
+                    </button>
+                  </div>
+                  {!gdClientId && (
+                    <p className="mt-1.5 text-[10px] text-slate-400">Enter a Client ID above to enable the connect button.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!IMPLEMENTED.has(providerType) && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
               <strong>{PROVIDER_META[providerType].label}</strong> is registered in the architecture but full
               configuration and uploads will be available in a future phase.
@@ -264,6 +436,30 @@ export default function StorageProvidersPage() {
   const [testingId,    setTestingId]   = useState<string | null>(null);
   const [testResult,   setTestResult]  = useState<{ id: string; ok: boolean; message: string } | null>(null);
   const [actionError,  setActionError] = useState("");
+  const [gdBanner,     setGdBanner]    = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  /* Detect gd_connected / gd_error URL params after OAuth redirect */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const gdOk  = params.get("gd_connected");
+    const gdErr = params.get("gd_error");
+    const ERRS: Record<string, string> = {
+      token_exchange_failed: "Token exchange with Google failed. Please try again.",
+      no_refresh_token:      "No refresh token returned — ensure you granted access.",
+      state_mismatch:        "Security state mismatch. Please try again.",
+      missing_credentials:   "Missing credentials. Save client ID and secret first.",
+      access_denied:         "Access was denied. Please grant the required Drive permissions.",
+    };
+    if (gdOk === "true") {
+      setGdBanner({ type: "success", message: "Google Drive connected! You can now test the connection." });
+    } else if (gdErr) {
+      setGdBanner({ type: "error", message: ERRS[gdErr] ?? `Connection failed: ${gdErr}` });
+    }
+    if (gdOk || gdErr) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const [draftSettings, setDraftSettings] = useState<{
     default_provider_id: string;
@@ -400,6 +596,22 @@ export default function StorageProvidersPage() {
       {actionError && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <XCircle className="h-4 w-4 shrink-0" /> {actionError}
+        </div>
+      )}
+
+      {gdBanner && (
+        <div className={`flex items-center gap-2 px-4 py-3 text-sm rounded-xl border ${
+          gdBanner.type === "success"
+            ? "bg-green-50 border-green-200 text-green-700"
+            : "bg-red-50 border-red-200 text-red-700"
+        }`}>
+          {gdBanner.type === "success"
+            ? <CheckCircle className="h-4 w-4 shrink-0" />
+            : <XCircle className="h-4 w-4 shrink-0" />}
+          {gdBanner.message}
+          <button onClick={() => setGdBanner(null)} className="ml-auto opacity-60 hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -650,7 +862,7 @@ export default function StorageProvidersPage() {
               ))}
             </div>
             <p className="text-xs text-slate-500 pt-1">
-              All providers share the same interface. Configuration and upload support for Google Drive, AWS S3, and Azure Blob will be enabled in upcoming phases.
+              All providers share the same interface. Google Drive is fully available. AWS S3 and Azure Blob support will be enabled in upcoming phases.
             </p>
           </div>
         </>

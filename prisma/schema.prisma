@@ -555,8 +555,9 @@ model DmsDocument {
   uploaded_by         String
   reference_type      String?  // COMPLIANCE | AMC | GENERAL
   reference_id        String?
-  sharepoint_item_id  String?  // Graph API DriveItem.id — used for preview/download/delete
-  drive_id            String?  // Graph API drive ID at upload time
+  sharepoint_item_id  String?  // Graph API DriveItem.id or Google Drive file ID
+  drive_id            String?  // Graph API drive ID (SP) or Google Shared Drive ID (GD)
+  storage_provider_id String?  // FK to StorageProvider (nullable for legacy files)
   created_at          DateTime @default(now())
 }
 

@@ -1,3 +1,7 @@
+/* Re-export the real implementation from google-drive-provider.ts */
+export { GoogleDriveStorageProvider } from "./google-drive-provider";
+
+/* Keep a dummy class reference so any stale direct imports don't break */
 import type {
   StorageProviderInterface,
   UploadFileParams,
@@ -8,50 +12,5 @@ import type {
   StorageProviderConfig,
 } from "../types";
 
-export class GoogleDriveStorageProvider implements StorageProviderInterface {
-  private config: StorageProviderConfig;
-
-  constructor(config: StorageProviderConfig) {
-    this.config = config;
-  }
-
-  async uploadFile(_params: UploadFileParams): Promise<UploadFileResult> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async downloadFile(_fileId: string, _filePath?: string): Promise<DownloadFileResult> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async deleteFile(_fileId: string, _filePath?: string): Promise<void> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async createFolder(_folderPath: string, _companyId: string): Promise<FolderResult> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async renameFile(_fileId: string, _newName: string): Promise<void> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async renameFolder(_folderId: string, _newName: string): Promise<void> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async generatePreviewUrl(_fileId: string, _filePath?: string): Promise<string> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async generateDownloadUrl(_fileId: string, _filePath?: string): Promise<string> {
-    throw new Error("GoogleDriveStorageProvider: not yet implemented.");
-  }
-
-  async testConnection(): Promise<TestConnectionResult> {
-    return {
-      ok: false,
-      message: "Google Drive provider is registered but not yet implemented. Full support coming in a future phase.",
-      details: { provider_id: this.config.id, name: this.config.name },
-    };
-  }
-}
+// Suppress unused import warnings — these types are part of the interface
+type _Unused = StorageProviderInterface | UploadFileParams | UploadFileResult | DownloadFileResult | FolderResult | TestConnectionResult | StorageProviderConfig;

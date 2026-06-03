@@ -7,6 +7,48 @@ import {
 import { logInternalError }            from "@/lib/error-log";
 import { validateRequiredString }      from "@/lib/validation";
 import { testProviderConnection }      from "@/lib/storage/storage-service";
+import { encryptPassword }             from "@/lib/smtp-crypto";
+
+type RawProvider = {
+  id: string; company_id: string; provider_type: string; name: string;
+  enabled: boolean; is_default: boolean; configuration_json: unknown;
+  provider_identifier: string | null; created_at: Date; updated_at: Date;
+};
+
+function sanitizeGDConfig(p: RawProvider) {
+  if (p.provider_type !== "GOOGLE_DRIVE" || !p.configuration_json) return p;
+  const {
+    client_secret_enc: _cs,
+    refresh_token_enc: _rt,
+    ...safe
+  } = p.configuration_json as Record<string, unknown>;
+  return {
+    ...p,
+    configuration_json: { ...safe, has_secret: !!_cs, has_refresh_token: !!_rt },
+  };
+}
+
+function encryptGDCredentials(
+  providerType: string,
+  incoming:     Record<string, unknown> | null | undefined,
+  existing:     Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? null;
+  const { client_secret, refresh_token, ...rest } = incoming;
+  const out: Record<string, unknown> = { ...rest };
+  if (typeof client_secret === "string" && client_secret) {
+    out.client_secret_enc = encryptPassword(client_secret);
+  } else if (existing?.client_secret_enc) {
+    out.client_secret_enc = existing.client_secret_enc;
+  }
+  if (existing?.refresh_token_enc && !out.refresh_token_enc) {
+    out.refresh_token_enc = existing.refresh_token_enc;
+  }
+  if (typeof refresh_token === "string" && refresh_token) {
+    out.refresh_token_enc = encryptPassword(refresh_token);
+  }
+  return out;
+}
 
 const SAFE_SELECT = {
   id: true, company_id: true, provider_type: true, name: true,
@@ -47,7 +89,11 @@ export async function PUT(
       where: { id },
       data: {
         name:               name?.trim()              ?? existing.name,
-        configuration_json: configuration_json        ?? existing.configuration_json,
+        configuration_json: encryptGDCredentials(
+          existing.provider_type,
+          configuration_json !== undefined ? configuration_json : null,
+          existing.configuration_json as Record<string, unknown> | null,
+        ) ?? existing.configuration_json,
         provider_identifier: provider_identifier !== undefined
           ? (provider_identifier?.trim() || null)
           : existing.provider_identifier,
@@ -74,7 +120,7 @@ export async function PUT(
       },
     });
 
-    return successResponse(updated);
+    return successResponse(sanitizeGDConfig(updated as RawProvider));
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("Validation")) {
       return errorResponse(err.message, 400, requestId);

@@ -6,6 +6,66 @@ import {
 } from "@/lib/api-response";
 import { logInternalError }            from "@/lib/error-log";
 import { validateRequiredString }      from "@/lib/validation";
+import { encryptPassword }             from "@/lib/smtp-crypto";
+
+/* ── Helpers for Google Drive credential handling ──────────────────── */
+
+type RawProvider = {
+  id: string; company_id: string; provider_type: string; name: string;
+  enabled: boolean; is_default: boolean; configuration_json: unknown;
+  provider_identifier: string | null; created_at: Date; updated_at: Date;
+};
+
+/**
+ * Strips encrypted Google Drive secrets from the JSON returned to clients.
+ * Replaces them with boolean indicators (has_secret, has_refresh_token).
+ */
+function sanitizeGDConfig(p: RawProvider) {
+  if (p.provider_type !== "GOOGLE_DRIVE" || !p.configuration_json) return p;
+  const {
+    client_secret_enc: _cs,
+    refresh_token_enc: _rt,
+    ...safe
+  } = p.configuration_json as Record<string, unknown>;
+  return {
+    ...p,
+    configuration_json: {
+      ...safe,
+      has_secret:        !!_cs,
+      has_refresh_token: !!_rt,
+    },
+  };
+}
+
+/**
+ * Encrypts plain-text Google Drive credentials before storing in configuration_json.
+ * Preserves existing encrypted values when the caller omits plain-text fields.
+ */
+function encryptGDCredentials(
+  providerType:   string,
+  incoming:       Record<string, unknown> | null | undefined,
+  existing:       Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? null;
+
+  const { client_secret, refresh_token, ...rest } = incoming;
+  const out: Record<string, unknown> = { ...rest };
+
+  if (typeof client_secret === "string" && client_secret) {
+    out.client_secret_enc = encryptPassword(client_secret);
+  } else if (existing?.client_secret_enc) {
+    out.client_secret_enc = existing.client_secret_enc;
+  }
+
+  if (existing?.refresh_token_enc && !out.refresh_token_enc) {
+    out.refresh_token_enc = existing.refresh_token_enc;
+  }
+  if (typeof refresh_token === "string" && refresh_token) {
+    out.refresh_token_enc = encryptPassword(refresh_token);
+  }
+
+  return out;
+}
 
 const SAFE_SELECT = {
   id: true, company_id: true, provider_type: true, name: true,
@@ -26,7 +86,7 @@ export async function GET(req: NextRequest) {
       select:  SAFE_SELECT,
       orderBy: [{ is_default: "desc" }, { created_at: "asc" }],
     });
-    return successResponse(providers);
+    return successResponse(providers.map(sanitizeGDConfig));
   } catch (err) {
     logInternalError(err, { route: "GET /api/protected/storage/providers", user_id, company_id, request_id: requestId });
     return errorResponse("Failed to load storage providers.", 500, requestId);
@@ -64,7 +124,7 @@ export async function POST(req: NextRequest) {
         company_id,
         name:               name.trim(),
         provider_type,
-        configuration_json: configuration_json ?? null,
+        configuration_json: encryptGDCredentials(provider_type, configuration_json, null),
         provider_identifier: provider_identifier?.trim() || null,
         is_default:         is_default ?? false,
         enabled:            true,
@@ -84,7 +144,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return successResponse(provider, 201);
+    return successResponse(sanitizeGDConfig(provider as RawProvider), 201);
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("Validation")) {
       return errorResponse(err.message, 400, requestId);

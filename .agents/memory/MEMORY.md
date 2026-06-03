@@ -1,3 +1,5 @@
 - [SharePoint provider refactor](sharepoint-provider-pattern.md) — SharePointStorageProvider delegates to lib/sharepoint-check.ts; credentials stay in SharePointConfig, never in StorageProvider.configuration_json.
 - [DMS upload service layer](dms-upload-service-layer.md) — DMS upload route now calls uploadDmsFile() from lib/storage/storage-service.ts; returns {fileId,webUrl,driveId,filePath} needed for DmsDocument FK fields.
 - [Storage provider auto-migration](storage-provider-auto-migration.md) — ensureSharePointProviderRegistered() auto-creates StorageProvider from SharePointConfig on first upload; called lazily, never blocks.
+- [Google Drive OAuth flow](google-drive-oauth.md) — GD refresh_token stored encrypted in StorageProvider.configuration_json; connect=GET /api/protected/storage/google/connect, callback stores token
+- [Storage multi-provider routing](storage-multi-provider.md) — uploadDmsFile routes to GD or SP; downloadFileFromProvider/deleteFileFromProvider accept both sharepoint_item_id and external_file_id
