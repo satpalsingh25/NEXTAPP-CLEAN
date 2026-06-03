@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   ShieldCheck, RefreshCw, Save, Eye, Pencil, Ban,
   CheckCircle, XCircle, Plus, X, Loader2, Users, GitMerge,
-  Download, RotateCcw,
+  Download, RotateCcw, Server,
 } from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
@@ -20,15 +20,21 @@ interface AuthSettings {
 }
 
 interface IdentityProvider {
-  id:            string;
-  name:          string;
-  provider_type: string;
-  enabled:       boolean;
-  client_id:     string | null;
-  tenant_id:     string | null;
-  redirect_uri:  string | null;
-  scopes:        string | null;
-  created_at:    string;
+  id:                  string;
+  name:                string;
+  provider_type:       string;
+  enabled:             boolean;
+  client_id:           string | null;
+  tenant_id:           string | null;
+  redirect_uri:        string | null;
+  scopes:              string | null;
+  ldap_url:            string | null;
+  ldap_bind_dn:        string | null;
+  ldap_base_dn:        string | null;
+  ldap_user_filter:    string | null;
+  ldap_group_filter:   string | null;
+  ldap_tls_enabled:    boolean | null;
+  created_at:          string;
 }
 
 interface GroupMapping {
@@ -51,6 +57,17 @@ interface ProviderForm {
   tenant_id:     string;
   redirect_uri:  string;
   scopes:        string;
+}
+
+interface LdapProviderForm {
+  name:              string;
+  ldap_url:          string;
+  ldap_bind_dn:      string;
+  ldap_bind_password: string;
+  ldap_base_dn:      string;
+  ldap_user_filter:  string;
+  ldap_group_filter: string;
+  ldap_tls_enabled:  boolean;
 }
 
 interface MappingForm {
@@ -91,6 +108,17 @@ const EMPTY_PROVIDER_FORM: ProviderForm = {
   tenant_id:     "",
   redirect_uri:  "",
   scopes:        "openid profile email User.Read",
+};
+
+const EMPTY_LDAP_FORM: LdapProviderForm = {
+  name:              "",
+  ldap_url:          "ldap://",
+  ldap_bind_dn:      "",
+  ldap_bind_password: "",
+  ldap_base_dn:      "",
+  ldap_user_filter:  "(objectClass=person)",
+  ldap_group_filter: "(objectClass=group)",
+  ldap_tls_enabled:  false,
 };
 
 const EMPTY_MAPPING_FORM: MappingForm = {
@@ -285,13 +313,189 @@ function AzureProviderModal({
   );
 }
 
+/* ── LDAP Provider Modal ────────────────────────────────────────────── */
+function LdapProviderModal({
+  editProvider, onClose, onSaved,
+}: {
+  editProvider: IdentityProvider | null; onClose: () => void; onSaved: () => void;
+}) {
+  const [form, setForm] = useState<LdapProviderForm>(() =>
+    editProvider
+      ? {
+          name:              editProvider.name,
+          ldap_url:          editProvider.ldap_url          ?? "ldap://",
+          ldap_bind_dn:      editProvider.ldap_bind_dn      ?? "",
+          ldap_bind_password: "",
+          ldap_base_dn:      editProvider.ldap_base_dn      ?? "",
+          ldap_user_filter:  editProvider.ldap_user_filter  ?? "(objectClass=person)",
+          ldap_group_filter: editProvider.ldap_group_filter ?? "(objectClass=group)",
+          ldap_tls_enabled:  editProvider.ldap_tls_enabled  ?? false,
+        }
+      : { ...EMPTY_LDAP_FORM }
+  );
+  const [saving,      setSaving]      = useState(false);
+  const [testing,     setTesting]     = useState(false);
+  const [savedId,     setSavedId]     = useState<string | null>(editProvider?.id ?? null);
+  const [testResult,  setTestResult]  = useState<{ success: boolean; message: string } | null>(null);
+  const [error,       setError]       = useState("");
+
+  const set = <K extends keyof LdapProviderForm>(key: K, val: LdapProviderForm[K]) =>
+    setForm((f) => ({ ...f, [key]: val }));
+
+  const handleSave = async () => {
+    setError("");
+    if (!form.name.trim())           { setError("Provider name is required."); return; }
+    if (!form.ldap_url.trim())       { setError("LDAP URL is required."); return; }
+    if (!form.ldap_bind_dn.trim())   { setError("Bind DN is required."); return; }
+    if (!editProvider && !form.ldap_bind_password.trim()) { setError("Bind password is required."); return; }
+    if (!form.ldap_base_dn.trim())   { setError("Base DN is required."); return; }
+
+    setSaving(true);
+    try {
+      const url    = editProvider ? `/api/protected/identity-providers/${editProvider.id}` : "/api/protected/identity-providers";
+      const method = editProvider ? "PUT" : "POST";
+      const payload: Record<string, unknown> = {
+        name:              form.name.trim(),
+        provider_type:     "LDAP",
+        ldap_url:          form.ldap_url.trim(),
+        ldap_bind_dn:      form.ldap_bind_dn.trim(),
+        ldap_base_dn:      form.ldap_base_dn.trim(),
+        ldap_user_filter:  form.ldap_user_filter.trim()  || "(objectClass=person)",
+        ldap_group_filter: form.ldap_group_filter.trim() || "(objectClass=group)",
+        ldap_tls_enabled:  form.ldap_tls_enabled,
+      };
+      if (form.ldap_bind_password.trim()) payload.ldap_bind_password = form.ldap_bind_password.trim();
+      const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save provider.");
+      setSavedId(data.id ?? editProvider?.id ?? null);
+      setTestResult(null);
+      onSaved();
+    } catch (e) { setError((e as Error).message); }
+    finally { setSaving(false); }
+  };
+
+  const handleTest = async () => {
+    if (!savedId) { setError("Save the provider first, then test the connection."); return; }
+    setTesting(true); setTestResult(null); setError("");
+    try {
+      const res  = await fetch("/api/protected/auth/ldap/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider_id: savedId }),
+      });
+      const data = await res.json();
+      setTestResult(res.ok ? (data.data ?? data) : { success: false, message: data.error ?? "Test failed." });
+    } catch { setTestResult({ success: false, message: "Network error during test." }); }
+    finally { setTesting(false); }
+  };
+
+  const inputCls = "mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const labelCls = "block text-sm font-medium text-slate-700";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-base font-semibold text-slate-800">
+            {editProvider ? "Edit LDAP / AD Provider" : "Add LDAP / Active Directory Provider"}
+          </h2>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{error}</div>}
+
+          <div>
+            <label className={labelCls}>Provider Name</label>
+            <input className={inputCls} placeholder="e.g. Contoso Active Directory" value={form.name}
+              onChange={(e) => set("name", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>LDAP Server URL</label>
+            <input className={inputCls} placeholder="ldap://dc.example.com:389  or  ldaps://dc.example.com:636"
+              value={form.ldap_url} onChange={(e) => set("ldap_url", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">Use <code>ldaps://</code> for TLS on port 636, or <code>ldap://</code> for standard port 389.</p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <input type="checkbox" id="tls" checked={form.ldap_tls_enabled}
+              onChange={(e) => set("ldap_tls_enabled", e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <label htmlFor="tls" className="text-sm text-slate-700 cursor-pointer">Enable TLS / LDAPS (skip certificate verification)</label>
+          </div>
+
+          <div>
+            <label className={labelCls}>Bind DN <span className="text-slate-400 font-normal">(service account)</span></label>
+            <input className={inputCls} placeholder="CN=svc-ldap,OU=ServiceAccounts,DC=example,DC=com"
+              value={form.ldap_bind_dn} onChange={(e) => set("ldap_bind_dn", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">Distinguished name of the service account used to search the directory.</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>
+              Bind Password {editProvider && <span className="ml-1 text-xs text-slate-400">(leave blank to keep existing)</span>}
+            </label>
+            <input className={inputCls} type="password" autoComplete="new-password"
+              placeholder={editProvider ? "••••••••••••••••" : "Service account password"}
+              value={form.ldap_bind_password} onChange={(e) => set("ldap_bind_password", e.target.value)} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Base DN <span className="text-slate-400 font-normal">(search root)</span></label>
+            <input className={inputCls} placeholder="DC=example,DC=com"
+              value={form.ldap_base_dn} onChange={(e) => set("ldap_base_dn", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">All user and group searches start from this DN.</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>User Filter <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input className={inputCls} placeholder="(objectClass=person)" value={form.ldap_user_filter}
+              onChange={(e) => set("ldap_user_filter", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">LDAP filter for users. Default: <code>(objectClass=person)</code>. For AD: <code>(&amp;(objectClass=user)(!(objectClass=computer)))</code></p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Group Filter <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input className={inputCls} placeholder="(objectClass=group)" value={form.ldap_group_filter}
+              onChange={(e) => set("ldap_group_filter", e.target.value)} />
+            <p className="mt-1 text-xs text-slate-500">LDAP filter for groups. Default: <code>(objectClass=group)</code>. For OpenLDAP: <code>(objectClass=groupOfNames)</code></p>
+          </div>
+
+          {testResult && (
+            <div className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${testResult.success ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+              {testResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+              {testResult.message}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 gap-3">
+          <button type="button" onClick={handleTest} disabled={testing || !savedId}
+            title={!savedId ? "Save the provider first to enable connection testing." : undefined}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+            {testing ? "Testing…" : "Test Connection"}
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? "Saving…" : "Save Provider"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Group Mapping Modal ────────────────────────────────────────────── */
 function GroupMappingModal({
   editMapping, providers, onClose, onSaved,
 }: {
   editMapping: GroupMapping | null; providers: IdentityProvider[]; onClose: () => void; onSaved: () => void;
 }) {
-  const azureProviders = providers.filter((p) => p.provider_type === "AZURE_AD" && p.enabled);
+  const externalProviders = providers.filter((p) => (p.provider_type === "AZURE_AD" || p.provider_type === "LDAP") && p.enabled);
 
   const [form,  setForm]  = useState<MappingForm>(() =>
     editMapping
@@ -303,7 +507,7 @@ function GroupMappingModal({
           auto_assign_role:     editMapping.auto_assign_role,
           enabled:              editMapping.enabled,
         }
-      : { ...EMPTY_MAPPING_FORM, identity_provider_id: azureProviders[0]?.id ?? "" }
+      : { ...EMPTY_MAPPING_FORM, identity_provider_id: externalProviders[0]?.id ?? "" }
   );
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
@@ -311,11 +515,14 @@ function GroupMappingModal({
   const set = <K extends keyof MappingForm>(key: K, val: MappingForm[K]) =>
     setForm((f) => ({ ...f, [key]: val }));
 
+  const selectedProvider = providers.find((p) => p.id === form.identity_provider_id);
+  const isLdap = selectedProvider?.provider_type === "LDAP";
+
   const handleSave = async () => {
     setError("");
     if (!form.identity_provider_id) { setError("Select an identity provider."); return; }
-    if (!form.external_group_id.trim())   { setError("Azure Group ID is required."); return; }
-    if (!form.external_group_name.trim()) { setError("Azure Group Name is required."); return; }
+    if (!form.external_group_id.trim())   { setError(`${isLdap ? "Group DN" : "Group ID"} is required.`); return; }
+    if (!form.external_group_name.trim()) { setError("Group Name is required."); return; }
 
     setSaving(true);
     try {
@@ -361,27 +568,37 @@ function GroupMappingModal({
               <select className={selectCls} value={form.identity_provider_id}
                 onChange={(e) => set("identity_provider_id", e.target.value)}>
                 <option value="">Select provider…</option>
-                {azureProviders.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {externalProviders.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({PROVIDER_LABEL[p.provider_type] ?? p.provider_type})</option>
                 ))}
               </select>
-              {azureProviders.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">No active Azure AD providers found. Add one first.</p>
+              {externalProviders.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">No active Azure AD or LDAP providers found. Add one first.</p>
               )}
             </div>
           )}
 
           <div>
-            <label className={labelCls}>Azure Group Name</label>
-            <input className={inputCls} placeholder="e.g. IT-Admins" value={form.external_group_name}
+            <label className={labelCls}>Group Name</label>
+            <input className={inputCls} placeholder={isLdap ? "e.g. IT Admins" : "e.g. IT-Admins"} value={form.external_group_name}
               onChange={(e) => set("external_group_name", e.target.value)} />
           </div>
 
           <div>
-            <label className={labelCls}>Azure Group ID <span className="text-slate-400 font-normal">(Object ID)</span></label>
-            <input className={inputCls} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            <label className={labelCls}>
+              {isLdap ? "Group DN" : "Group ID"}{" "}
+              <span className="text-slate-400 font-normal">
+                {isLdap ? "(Distinguished Name)" : "(Object ID)"}
+              </span>
+            </label>
+            <input className={inputCls}
+              placeholder={isLdap ? "CN=IT-Admins,OU=Groups,DC=example,DC=com" : "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
               value={form.external_group_id} onChange={(e) => set("external_group_id", e.target.value)} />
-            <p className="mt-1 text-xs text-slate-500">Azure Portal → Groups → select group → Object ID.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {isLdap
+                ? "Full DN of the LDAP group. Must match the group DN returned by your directory."
+                : "Azure Portal → Groups → select group → Object ID."}
+            </p>
           </div>
 
           <div>
@@ -392,7 +609,7 @@ function GroupMappingModal({
                 <option key={r} value={r}>{ROLE_LABEL[r] ?? r}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-slate-500">Role assigned to users in this Azure group.</p>
+            <p className="mt-1 text-xs text-slate-500">Role assigned to users in this group.</p>
           </div>
 
           <div className="space-y-2 pt-1">
@@ -436,9 +653,13 @@ export default function AuthenticationSettingsPage() {
   const [error,        setError]        = useState("");
   const [success,      setSuccess]      = useState("");
 
-  /* Provider modal */
-  const [showProviderModal, setShowProviderModal] = useState(false);
-  const [editProvider,      setEditProvider]      = useState<IdentityProvider | null>(null);
+  /* Azure provider modal */
+  const [showAzureModal,  setShowAzureModal]  = useState(false);
+  const [editAzureProvider, setEditAzureProvider] = useState<IdentityProvider | null>(null);
+
+  /* LDAP provider modal */
+  const [showLdapModal,   setShowLdapModal]   = useState(false);
+  const [editLdapProvider, setEditLdapProvider] = useState<IdentityProvider | null>(null);
 
   /* Group mapping modal */
   const [showMappingModal,  setShowMappingModal]  = useState(false);
@@ -471,7 +692,8 @@ export default function AuthenticationSettingsPage() {
       setProviders(pList);
       setMappings(Array.isArray(m?.data) ? m.data : Array.isArray(m) ? m : []);
       if (!selectedProvider && pList.length > 0) {
-        setSelectedProvider(pList.find((p: IdentityProvider) => p.provider_type === "AZURE_AD")?.id ?? pList[0].id);
+        const first = pList.find((p: IdentityProvider) => p.provider_type === "AZURE_AD" || p.provider_type === "LDAP");
+        setSelectedProvider(first?.id ?? pList[0].id);
       }
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -505,6 +727,14 @@ export default function AuthenticationSettingsPage() {
     } catch (e) { setError((e as Error).message); }
   };
 
+  const handleEditProvider = (p: IdentityProvider) => {
+    if (p.provider_type === "LDAP") {
+      setEditLdapProvider(p); setShowLdapModal(true);
+    } else {
+      setEditAzureProvider(p); setShowAzureModal(true);
+    }
+  };
+
   const handleToggleMapping = async (mapping: GroupMapping) => {
     try {
       const res = await fetch(`/api/protected/auth/group-mappings/${mapping.id}`, {
@@ -518,9 +748,13 @@ export default function AuthenticationSettingsPage() {
 
   const handleImportUsers = async () => {
     if (!selectedProvider) { setError("Select a provider first."); return; }
+    const prov = providers.find((p) => p.id === selectedProvider);
     setImportingUsers(true); setImportResult(null); setError("");
     try {
-      const res  = await fetch("/api/protected/auth/azure/import-users", {
+      const endpoint = prov?.provider_type === "LDAP"
+        ? "/api/protected/auth/ldap/import-users"
+        : "/api/protected/auth/azure/import-users";
+      const res  = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider_id: selectedProvider }),
       });
@@ -533,9 +767,13 @@ export default function AuthenticationSettingsPage() {
 
   const handleSyncGroups = async () => {
     if (!selectedProvider) { setError("Select a provider first."); return; }
+    const prov = providers.find((p) => p.id === selectedProvider);
     setSyncingGroups(true); setSyncResult(null); setError("");
     try {
-      const res  = await fetch("/api/protected/auth/azure/sync-groups", {
+      const endpoint = prov?.provider_type === "LDAP"
+        ? "/api/protected/auth/ldap/sync-groups"
+        : "/api/protected/auth/azure/sync-groups";
+      const res  = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider_id: selectedProvider }),
       });
@@ -549,7 +787,8 @@ export default function AuthenticationSettingsPage() {
   const set = (key: keyof AuthSettings) => (val: boolean) =>
     setSettings((s) => ({ ...s, [key]: val }));
 
-  const azureProviders = providers.filter((p) => p.provider_type === "AZURE_AD");
+  const externalProviders = providers.filter((p) => p.provider_type === "AZURE_AD" || p.provider_type === "LDAP");
+  const selectedProviderType = providers.find((p) => p.id === selectedProvider)?.provider_type ?? "AZURE_AD";
 
   if (loading) {
     return (
@@ -562,11 +801,18 @@ export default function AuthenticationSettingsPage() {
   return (
     <div className="max-w-4xl space-y-6">
       {/* Modals */}
-      {showProviderModal && (
+      {showAzureModal && (
         <AzureProviderModal
-          editProvider={editProvider} baseUrl={baseUrl}
-          onClose={() => { setShowProviderModal(false); setEditProvider(null); }}
-          onSaved={() => { setShowProviderModal(false); setEditProvider(null); loadAll(); }}
+          editProvider={editAzureProvider} baseUrl={baseUrl}
+          onClose={() => { setShowAzureModal(false); setEditAzureProvider(null); }}
+          onSaved={() => { setShowAzureModal(false); setEditAzureProvider(null); loadAll(); }}
+        />
+      )}
+      {showLdapModal && (
+        <LdapProviderModal
+          editProvider={editLdapProvider}
+          onClose={() => { setShowLdapModal(false); setEditLdapProvider(null); }}
+          onSaved={() => { setShowLdapModal(false); setEditLdapProvider(null); loadAll(); }}
         />
       )}
       {showMappingModal && (
@@ -603,9 +849,9 @@ export default function AuthenticationSettingsPage() {
       {/* Tab bar */}
       <div className="flex border-b border-slate-200">
         {([
-          { key: "methods",   label: "Login Methods",       icon: ShieldCheck },
-          { key: "providers", label: "Identity Providers",  icon: Eye },
-          { key: "groups",    label: "Azure Group Mapping", icon: GitMerge },
+          { key: "methods",   label: "Login Methods",      icon: ShieldCheck },
+          { key: "providers", label: "Identity Providers", icon: Eye },
+          { key: "groups",    label: "Group Mapping",      icon: GitMerge },
         ] as { key: ActiveTab; label: string; icon: (props: { className?: string }) => JSX.Element }[]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -628,12 +874,12 @@ export default function AuthenticationSettingsPage() {
               <p className="text-xs text-slate-500 mt-0.5">At least one method must remain enabled.</p>
             </div>
             <div className="px-6 py-2">
-              <Toggle label="Enable Local Login"                description="Email + password stored in this system."                       checked={settings.allow_local_login}  onChange={set("allow_local_login")} />
-              <Toggle label="Enable Azure AD / Entra ID Login" description="Microsoft Azure Active Directory via OAuth 2.0 / OIDC."        checked={settings.allow_azure_login}  onChange={set("allow_azure_login")} />
-              <Toggle label="Enable Google Workspace Login"    description="Coming soon — Google Workspace OAuth 2.0."                     checked={settings.allow_google_login} onChange={set("allow_google_login")} />
-              <Toggle label="Enable LDAP / AD Login"           description="Coming soon — on-premise directory integration."              checked={settings.allow_ldap_login}   onChange={set("allow_ldap_login")} />
-              <Toggle label="Enable SAML Login"                description="Coming soon — SAML 2.0 single sign-on."                       checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
-              <Toggle label="Enable OIDC Login"                description="Coming soon — OpenID Connect."                                checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
+              <Toggle label="Enable Local Login"                description="Email + password stored in this system."                              checked={settings.allow_local_login}  onChange={set("allow_local_login")} />
+              <Toggle label="Enable Azure AD / Entra ID Login" description="Microsoft Azure Active Directory via OAuth 2.0 / OIDC."               checked={settings.allow_azure_login}  onChange={set("allow_azure_login")} />
+              <Toggle label="Enable Google Workspace Login"    description="Coming soon — Google Workspace OAuth 2.0."                            checked={settings.allow_google_login} onChange={set("allow_google_login")} />
+              <Toggle label="Enable LDAP / AD Login"           description="On-premise Active Directory or LDAP directory server."               checked={settings.allow_ldap_login}   onChange={set("allow_ldap_login")} />
+              <Toggle label="Enable SAML Login"                description="Coming soon — SAML 2.0 single sign-on."                              checked={settings.allow_saml_login}   onChange={set("allow_saml_login")} />
+              <Toggle label="Enable OIDC Login"                description="Coming soon — OpenID Connect."                                       checked={settings.allow_oidc_login}   onChange={set("allow_oidc_login")} />
             </div>
           </div>
 
@@ -648,7 +894,7 @@ export default function AuthenticationSettingsPage() {
             </div>
           </div>
 
-          {/* Azure Setup Guide */}
+          {/* Setup guides */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
             <h3 className="text-sm font-semibold text-amber-800 mb-3">Azure AD App Registration Setup</h3>
             <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
@@ -658,9 +904,20 @@ export default function AuthenticationSettingsPage() {
               <li>Copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong></li>
               <li>Go to <strong>Certificates &amp; secrets → New client secret</strong>, copy the secret <em>value</em></li>
               <li>Go to <strong>API permissions → Microsoft Graph → Delegated</strong>: add <code className="bg-amber-100 px-1 rounded">openid profile email User.Read</code></li>
-              <li>For user/group sync, also add <strong>Application permissions</strong>: <code className="bg-amber-100 px-1 rounded">User.Read.All</code>, <code className="bg-amber-100 px-1 rounded">Group.Read.All</code>, <code className="bg-amber-100 px-1 rounded">GroupMember.Read.All</code></li>
+              <li>For user/group sync, also add <strong>Application permissions</strong>: <code className="bg-amber-100 px-1 rounded">User.Read.All</code>, <code className="bg-amber-100 px-1 rounded">Group.Read.All</code></li>
               <li>Click <strong>Grant admin consent</strong></li>
-              <li>Enter all values in the <strong>Identity Providers</strong> tab and click <strong>Test Connection</strong></li>
+            </ol>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">LDAP / Active Directory Setup</h3>
+            <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside">
+              <li>Create a <strong>service account</strong> in your directory with read-only access to users and groups</li>
+              <li>Note the service account&apos;s <strong>Distinguished Name (DN)</strong> and password</li>
+              <li>Find your directory&apos;s <strong>Base DN</strong> (e.g. <code className="bg-slate-100 px-1 rounded">DC=example,DC=com</code>)</li>
+              <li>Add an <strong>LDAP provider</strong> in the Identity Providers tab</li>
+              <li>Enable <strong>LDAP / AD Login</strong> above and save</li>
+              <li>Use <strong>Import Users</strong> in the Group Mapping tab to pull directory users</li>
             </ol>
           </div>
         </>
@@ -674,24 +931,30 @@ export default function AuthenticationSettingsPage() {
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Identity Providers</h2>
               <p className="text-xs text-slate-500 mt-0.5">Configured external authentication providers.</p>
             </div>
-            <button onClick={() => { setEditProvider(null); setShowProviderModal(true); }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
-              <Plus className="h-3.5 w-3.5" /> Add Azure AD
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => { setEditLdapProvider(null); setShowLdapModal(true); }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50">
+                <Server className="h-3.5 w-3.5" /> Add LDAP
+              </button>
+              <button onClick={() => { setEditAzureProvider(null); setShowAzureModal(true); }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
+                <Plus className="h-3.5 w-3.5" /> Add Azure AD
+              </button>
+            </div>
           </div>
 
           {providers.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <ShieldCheck className="h-10 w-10 text-slate-300 mx-auto mb-3" />
               <p className="text-sm font-medium text-slate-500">No identity providers configured</p>
-              <p className="text-xs text-slate-400 mt-1">Click &quot;Add Azure AD&quot; to configure your first provider.</p>
+              <p className="text-xs text-slate-400 mt-1">Add Azure AD or LDAP to enable external authentication.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead className="bg-slate-50">
                   <tr>
-                    {["Name", "Provider", "Tenant ID", "Status", "Created", "Actions"].map((h) => (
+                    {["Name", "Provider", "Details", "Status", "Created", "Actions"].map((h) => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
@@ -701,12 +964,16 @@ export default function AuthenticationSettingsPage() {
                     <tr key={p.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 text-sm font-medium text-slate-800">{p.name}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">{PROVIDER_LABEL[p.provider_type] ?? p.provider_type}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 font-mono">{p.tenant_id ? `${p.tenant_id.slice(0, 8)}…` : "—"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500 font-mono">
+                        {p.provider_type === "LDAP"
+                          ? (p.ldap_url ? p.ldap_url.replace(/^ldaps?:\/\//, "").split(":")[0].slice(0, 24) : "—")
+                          : (p.tenant_id ? `${p.tenant_id.slice(0, 8)}…` : "—")}
+                      </td>
                       <td className="px-6 py-4"><StatusBadge enabled={p.enabled} /></td>
                       <td className="px-6 py-4 text-sm text-slate-500">{new Date(p.created_at).toLocaleDateString()}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1">
-                          <button title="Edit" onClick={() => { setEditProvider(p); setShowProviderModal(true); }}
+                          <button title="Edit" onClick={() => handleEditProvider(p)}
                             className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded">
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -725,38 +992,40 @@ export default function AuthenticationSettingsPage() {
         </div>
       )}
 
-      {/* ── Tab: Azure Group Mapping ───────────────────────────────────── */}
+      {/* ── Tab: Group Mapping ─────────────────────────────────────────── */}
       {activeTab === "groups" && (
         <div className="space-y-6">
           {/* Provider selector + sync actions */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Azure AD Provider</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Identity Provider</label>
                 <select
                   value={selectedProvider}
                   onChange={(e) => setSelectedProvider(e.target.value)}
                   className="block w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                 >
                   <option value="">Select provider…</option>
-                  {azureProviders.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}{!p.enabled ? " (disabled)" : ""}</option>
+                  {externalProviders.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({PROVIDER_LABEL[p.provider_type] ?? p.provider_type}){!p.enabled ? " (disabled)" : ""}
+                    </option>
                   ))}
                 </select>
-                {azureProviders.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-600">No Azure AD providers configured. Add one in the Identity Providers tab.</p>
+                {externalProviders.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">No Azure AD or LDAP providers configured. Add one in the Identity Providers tab.</p>
                 )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={handleImportUsers} disabled={importingUsers || !selectedProvider}
                   className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50">
                   {importingUsers ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  {importingUsers ? "Importing…" : "Import Azure Users"}
+                  {importingUsers ? "Importing…" : `Import ${selectedProviderType === "LDAP" ? "LDAP" : "Azure"} Users`}
                 </button>
                 <button onClick={handleSyncGroups} disabled={syncingGroups || !selectedProvider}
                   className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50">
                   {syncingGroups ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                  {syncingGroups ? "Syncing…" : "Sync Azure Groups"}
+                  {syncingGroups ? "Syncing…" : `Sync ${selectedProviderType === "LDAP" ? "LDAP" : "Azure"} Groups`}
                 </button>
               </div>
             </div>
@@ -823,7 +1092,7 @@ export default function AuthenticationSettingsPage() {
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Group → Role Mappings</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Map Azure AD groups to application roles. Roles assigned automatically on login.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Map directory groups to application roles. Roles are assigned automatically on login.</p>
               </div>
               <button onClick={() => { setEditMapping(null); setShowMappingModal(true); }}
                 className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
@@ -835,14 +1104,14 @@ export default function AuthenticationSettingsPage() {
               <div className="px-6 py-12 text-center">
                 <GitMerge className="h-10 w-10 text-slate-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-slate-500">No group mappings configured</p>
-                <p className="text-xs text-slate-400 mt-1">Add a mapping to automatically assign roles based on Azure AD group membership.</p>
+                <p className="text-xs text-slate-400 mt-1">Add a mapping to automatically assign roles based on group membership.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["Azure Group", "Group ID", "App Role", "Auto Assign", "Status", "Actions"].map((h) => (
+                      {["Group Name", "Group ID / DN", "Provider", "App Role", "Auto Assign", "Status", "Actions"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -851,7 +1120,10 @@ export default function AuthenticationSettingsPage() {
                     {mappings.map((m) => (
                       <tr key={m.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 text-sm font-medium text-slate-800">{m.external_group_name}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500 font-mono">{m.external_group_id.slice(0, 8)}…</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 font-mono max-w-[160px] truncate" title={m.external_group_id}>
+                          {m.external_group_id.length > 20 ? `${m.external_group_id.slice(0, 20)}…` : m.external_group_id}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{m.identity_provider.name}</td>
                         <td className="px-4 py-3">
                           {m.app_role ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -892,11 +1164,11 @@ export default function AuthenticationSettingsPage() {
           {/* Info box */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-xs text-blue-700 space-y-1.5">
             <p className="font-semibold text-blue-800 text-sm mb-2">How Group Mapping Works</p>
-            <p>• <strong>Import Azure Users</strong> pulls all users from your Azure AD directory and creates/updates accounts here.</p>
-            <p>• <strong>Sync Azure Groups</strong> fetches group memberships and stores them on each user. Roles from active auto-assign mappings are applied immediately.</p>
-            <p>• On every <strong>Azure login</strong>, the user&apos;s stored group IDs are checked against active mappings — the highest-privilege matching role is applied automatically.</p>
+            <p>• <strong>Import Users</strong> pulls users from Azure AD or LDAP and creates/updates accounts here.</p>
+            <p>• <strong>Sync Groups</strong> fetches group memberships and stores them on each user. Roles from active auto-assign mappings are applied immediately.</p>
+            <p>• On every <strong>external login</strong>, the user&apos;s group memberships are checked against active mappings — the highest-privilege matching role is applied automatically.</p>
             <p>• <strong>Local users</strong> are never modified by import or sync operations.</p>
-            <p>• Additional Graph API permissions required for sync: <code className="bg-blue-100 px-1 rounded">User.Read.All</code>, <code className="bg-blue-100 px-1 rounded">Group.Read.All</code>, <code className="bg-blue-100 px-1 rounded">GroupMember.Read.All</code> (Application permissions, admin consent required).</p>
+            <p>• For LDAP, the <strong>Group ID / DN</strong> field should be the full Distinguished Name of the group (e.g. <code className="bg-blue-100 px-1 rounded">CN=Admins,OU=Groups,DC=example,DC=com</code>).</p>
           </div>
         </div>
       )}

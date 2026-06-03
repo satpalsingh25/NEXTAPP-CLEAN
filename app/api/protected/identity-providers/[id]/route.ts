@@ -8,17 +8,23 @@ import { logInternalError }                 from "@/lib/error-log";
 import { validateRequiredString }           from "@/lib/validation";
 
 const SAFE_SELECT = {
-  id:            true,
-  name:          true,
-  provider_type: true,
-  enabled:       true,
-  client_id:     true,
-  tenant_id:     true,
-  redirect_uri:  true,
-  scopes:        true,
-  created_at:    true,
-  updated_at:    true,
-  /* client_secret intentionally excluded from all reads */
+  id:                  true,
+  name:                true,
+  provider_type:       true,
+  enabled:             true,
+  client_id:           true,
+  tenant_id:           true,
+  redirect_uri:        true,
+  scopes:              true,
+  ldap_url:            true,
+  ldap_bind_dn:        true,
+  ldap_base_dn:        true,
+  ldap_user_filter:    true,
+  ldap_group_filter:   true,
+  ldap_tls_enabled:    true,
+  created_at:          true,
+  updated_at:          true,
+  /* client_secret + ldap_bind_password intentionally excluded from all reads */
 };
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -72,18 +78,29 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       ? validateRequiredString(body.name, 128, "Name")
       : existing.name;
 
-    /* Build update payload — only include secret if explicitly provided (not empty) */
+    /* Build update payload — only include secrets when explicitly provided (non-empty) */
     const updateData: Record<string, unknown> = {
       name,
-      client_id:    (body.client_id as string) ?? undefined,
-      tenant_id:    (body.tenant_id as string) ?? undefined,
-      redirect_uri: (body.redirect_uri as string) ?? undefined,
-      scopes:       (body.scopes as string) ?? undefined,
+      /* Azure AD / OIDC fields */
+      client_id:         body.client_id    !== undefined ? ((body.client_id as string)    || null) : undefined,
+      tenant_id:         body.tenant_id    !== undefined ? ((body.tenant_id as string)    || null) : undefined,
+      redirect_uri:      body.redirect_uri !== undefined ? ((body.redirect_uri as string) || null) : undefined,
+      scopes:            body.scopes       !== undefined ? ((body.scopes as string)       || null) : undefined,
+      /* LDAP fields */
+      ldap_url:          body.ldap_url          !== undefined ? ((body.ldap_url as string)          || null) : undefined,
+      ldap_bind_dn:      body.ldap_bind_dn      !== undefined ? ((body.ldap_bind_dn as string)      || null) : undefined,
+      ldap_base_dn:      body.ldap_base_dn      !== undefined ? ((body.ldap_base_dn as string)      || null) : undefined,
+      ldap_user_filter:  body.ldap_user_filter  !== undefined ? ((body.ldap_user_filter as string)  || null) : undefined,
+      ldap_group_filter: body.ldap_group_filter !== undefined ? ((body.ldap_group_filter as string) || null) : undefined,
+      ldap_tls_enabled:  typeof body.ldap_tls_enabled === "boolean" ? body.ldap_tls_enabled : undefined,
     };
 
-    /* Only update secret when explicitly provided and non-empty */
+    /* Only update secrets when explicitly provided and non-empty */
     if (body.client_secret && typeof body.client_secret === "string" && body.client_secret.trim()) {
       updateData.client_secret = body.client_secret.trim();
+    }
+    if (body.ldap_bind_password && typeof body.ldap_bind_password === "string" && body.ldap_bind_password.trim()) {
+      updateData.ldap_bind_password = body.ldap_bind_password.trim();
     }
 
     if (typeof body.enabled === "boolean") {

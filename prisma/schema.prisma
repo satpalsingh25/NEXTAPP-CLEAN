@@ -633,6 +633,14 @@ model IdentityProvider {
   tenant_id          String?
   redirect_uri       String?
   scopes             String?
+  /* ── LDAP / Active Directory fields ── */
+  ldap_url           String?
+  ldap_bind_dn       String?
+  ldap_bind_password String?
+  ldap_base_dn       String?
+  ldap_user_filter   String?
+  ldap_group_filter  String?
+  ldap_tls_enabled   Boolean          @default(false)
   created_at         DateTime         @default(now())
   updated_at         DateTime         @updatedAt
 

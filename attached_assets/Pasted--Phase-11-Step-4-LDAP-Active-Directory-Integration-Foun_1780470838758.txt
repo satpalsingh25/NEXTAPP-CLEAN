@@ -1,0 +1,350 @@
+# 🚀 Phase 11 — Step 4
+
+# LDAP / Active Directory Integration Foundation
+
+## Replit Optimized Prompt
+
+```text id="p11step4"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 11 Step 1 → Identity architecture
+- Phase 11 Step 2 → Azure AD login
+- Phase 11 Step 3 → Azure user sync + group mapping
+
+DO NOT break existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Build LDAP / Active Directory authentication foundation.
+
+Requirements:
+- Support on-prem Active Directory
+- Support generic LDAP
+- Keep LOCAL login working
+- Keep Azure login working
+- Multi-company isolation
+- Optional LDAP usage
+- Hybrid login support
+
+Must support:
+- LDAP login
+- LDAP user import
+- LDAP group sync foundation
+- Role mapping preparation
+
+DO NOT implement:
+- SAML
+- OIDC
+- SCIM
+- Background schedulers
+- Full automation workers
+
+====================================================
+1. INSTALL REQUIRED PACKAGES
+====================================================
+
+Install stable LDAP packages compatible with current Next.js environment.
+
+Requirements:
+- Secure LDAP support
+- LDAPS support
+- Connection pooling if available
+
+====================================================
+2. EXTEND IDENTITY PROVIDER MODEL
+====================================================
+
+Add nullable LDAP-specific fields:
+
+ldap_url              String?
+ldap_bind_dn          String?
+ldap_bind_password    String?
+ldap_base_dn          String?
+ldap_user_filter      String?
+ldap_group_filter     String?
+ldap_tls_enabled      Boolean? @default(false)
+
+Rules:
+- Safe migration
+- No table recreation
+- No auth breakage
+
+====================================================
+3. CREATE LDAP PROVIDER SERVICE
+====================================================
+
+Create:
+
+/lib/auth-providers/providers/ldap-provider.ts
+
+Responsibilities:
+- Connect LDAP
+- Authenticate user
+- Search users
+- Search groups
+- Test connection
+
+Must implement:
+IdentityAuthProvider
+
+====================================================
+4. CREATE LDAP CLIENT SERVICE
+====================================================
+
+Create:
+
+/lib/auth-providers/ldap/client.ts
+
+Responsibilities:
+- Secure LDAP connection
+- Bind operations
+- Search operations
+- TLS support
+- Connection cleanup
+
+====================================================
+5. CREATE LDAP CONFIGURATION UI
+====================================================
+
+Under:
+
+Admin
+ └── Authentication Settings
+
+Add:
+[ Add LDAP Provider ]
+
+Fields:
+
+- Provider Name
+- LDAP URL
+- Bind DN
+- Bind Password
+- Base DN
+- User Filter
+- Group Filter
+- Enable TLS/SSL
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+6. SECURE CREDENTIAL HANDLING
+====================================================
+
+Requirements:
+- Never expose bind password
+- Mask secrets on edit
+- Store securely
+- Prevent frontend leaks
+
+====================================================
+7. LDAP LOGIN FLOW
+====================================================
+
+On login page:
+
+If LDAP enabled:
+Show:
+
+[ Sign in with LDAP ]
+
+OR integrate into existing username/password flow.
+
+Choose architecture best aligned with current app.
+
+Requirements:
+- Company aware login
+- Multi-tenant safe
+- No cross-company login
+
+====================================================
+8. LDAP AUTHENTICATION FLOW
+====================================================
+
+Flow:
+
+- User enters username/password
+- Find LDAP provider for company
+- Bind using service account
+- Find user
+- Attempt user bind
+- Validate success
+- Create/link app user
+- Create session
+
+====================================================
+9. USER CREATION RULES
+====================================================
+
+If LDAP user exists:
+- Link account
+
+If LDAP user missing:
+- Auto create:
+  - auth_provider = LDAP
+  - is_external_user = true
+
+Never:
+- overwrite local passwords
+- remove local users
+
+====================================================
+10. LDAP GROUP IMPORT FOUNDATION
+====================================================
+
+Fetch:
+- LDAP groups
+- Memberships
+
+Store:
+- external_group_ids
+
+Prepare future mapping support.
+
+====================================================
+11. CREATE LDAP IMPORT APIs
+====================================================
+
+Create secure APIs:
+
+POST /api/protected/auth/ldap/test
+POST /api/protected/auth/ldap/import-users
+POST /api/protected/auth/ldap/sync-groups
+
+Requirements:
+- Company isolation
+- Validation
+- Role protection
+- Audit logging
+
+====================================================
+12. USER IMPORT UI
+====================================================
+
+Add buttons:
+
+[ Import LDAP Users ]
+[ Sync LDAP Groups ]
+
+Show:
+- imported count
+- updated count
+- failures
+
+====================================================
+13. ROLE MAPPING SUPPORT
+====================================================
+
+Reuse existing:
+IdentityGroupMapping
+
+Support:
+provider_type = LDAP
+
+No duplicate architecture.
+
+====================================================
+14. LOGIN PAGE REFACTOR
+====================================================
+
+Refactor login page to support:
+
+- LOCAL
+- AZURE_AD
+- LDAP
+
+Architecture must be provider-driven.
+
+Future ready for:
+- SAML
+- OIDC
+- Google
+
+====================================================
+15. SECURITY REQUIREMENTS
+====================================================
+
+Validate:
+- LDAP injection protection
+- TLS support
+- Company/provider ownership
+- User isolation
+- Group isolation
+
+Prevent:
+- cross-company auth
+- anonymous binds
+- unsafe queries
+
+====================================================
+16. AUDIT LOGGING
+====================================================
+
+Log:
+- LDAP login success/failure
+- User imports
+- Group syncs
+- Provider updates
+- Failed binds
+
+Use existing audit system.
+
+====================================================
+17. PERFORMANCE REQUIREMENTS
+====================================================
+
+Requirements:
+- Efficient LDAP queries
+- Paged search if supported
+- Avoid duplicate imports
+- Future-ready for large directories
+
+====================================================
+18. IMPORTANT RULES
+====================================================
+
+- DO NOT break local login
+- DO NOT break Azure login
+- DO NOT force LDAP
+- DO NOT implement SAML
+- DO NOT implement OIDC
+- DO NOT implement schedulers yet
+- DO NOT expose bind password
+- DO NOT delete users automatically
+
+====================================================
+19. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Prisma generate
+- Prisma migrate
+- Typecheck
+- Local login works
+- Azure login works
+- LDAP login works
+- Multi-tenant isolation works
+- Import works
+- No TS errors
+- App boots cleanly
+
+====================================================
+20. OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- APIs added
+- DB changes
+- LDAP flow summary
+- Required LDAP settings
+- TLS requirements
+- Sample LDAP configuration
+- Any manual setup needed
+```

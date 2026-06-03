@@ -9,17 +9,23 @@ import { validateRequiredString }           from "@/lib/validation";
 import { AuthProviderType }                 from "@prisma/client";
 
 const SAFE_SELECT = {
-  id:            true,
-  name:          true,
-  provider_type: true,
-  enabled:       true,
-  client_id:     true,
-  tenant_id:     true,
-  redirect_uri:  true,
-  scopes:        true,
-  created_at:    true,
-  updated_at:    true,
-  /* client_secret intentionally excluded */
+  id:                  true,
+  name:                true,
+  provider_type:       true,
+  enabled:             true,
+  client_id:           true,
+  tenant_id:           true,
+  redirect_uri:        true,
+  scopes:              true,
+  ldap_url:            true,
+  ldap_bind_dn:        true,
+  ldap_base_dn:        true,
+  ldap_user_filter:    true,
+  ldap_group_filter:   true,
+  ldap_tls_enabled:    true,
+  created_at:          true,
+  updated_at:          true,
+  /* client_secret + ldap_bind_password intentionally excluded */
 };
 
 /* ── GET /api/protected/identity-providers ─────────────────────────── */
@@ -68,12 +74,21 @@ export async function POST(req: NextRequest) {
         company_id,
         provider_type,
         name,
-        enabled:       true,
-        client_id:     (body.client_id as string) || null,
-        client_secret: (body.client_secret as string) || null,
-        tenant_id:     (body.tenant_id as string) || null,
-        redirect_uri:  (body.redirect_uri as string) || null,
-        scopes:        (body.scopes as string) || "openid profile email User.Read",
+        enabled:             true,
+        /* Azure AD / OIDC fields */
+        client_id:           (body.client_id as string)    || null,
+        client_secret:       (body.client_secret as string) || null,
+        tenant_id:           (body.tenant_id as string)    || null,
+        redirect_uri:        (body.redirect_uri as string) || null,
+        scopes:              (body.scopes as string)        || null,
+        /* LDAP fields */
+        ldap_url:            (body.ldap_url as string)            || null,
+        ldap_bind_dn:        (body.ldap_bind_dn as string)        || null,
+        ldap_bind_password:  (body.ldap_bind_password as string)  || null,
+        ldap_base_dn:        (body.ldap_base_dn as string)        || null,
+        ldap_user_filter:    (body.ldap_user_filter as string)    || null,
+        ldap_group_filter:   (body.ldap_group_filter as string)   || null,
+        ldap_tls_enabled:    typeof body.ldap_tls_enabled === "boolean" ? body.ldap_tls_enabled : false,
       },
       select: SAFE_SELECT,
     });

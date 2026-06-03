@@ -99,6 +99,92 @@ function LocalLoginForm({
   );
 }
 
+/* ── LDAP login form ────────────────────────────────────────────────── */
+function LdapLoginForm({
+  primary,
+  onSuccess,
+}: {
+  primary: string;
+  onSuccess: () => void;
+}) {
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/ldap/login", {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "include",
+        body:        JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onSuccess();
+      } else {
+        setError(data.error || "LDAP authentication failed. Check your credentials.");
+      }
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form className="space-y-5" onSubmit={handleSubmit}>
+      {error && (
+        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm border border-red-100">
+          {error}
+        </div>
+      )}
+      <div>
+        <label htmlFor="ldap-email" className="block text-sm font-medium text-slate-700">
+          Directory email / username
+        </label>
+        <input
+          id="ldap-email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div>
+        <label htmlFor="ldap-password" className="block text-sm font-medium text-slate-700">
+          Directory password
+        </label>
+        <input
+          id="ldap-password"
+          name="password"
+          type="password"
+          required
+          autoComplete="current-password"
+          className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white disabled:opacity-50 transition-colors"
+        style={{ backgroundColor: primary }}
+      >
+        {loading ? "Signing in…" : "Sign in with Directory"}
+      </button>
+    </form>
+  );
+}
+
 /* ── Microsoft sign-in button ───────────────────────────────────────── */
 function MicrosoftButton({ providerId }: { providerId: string }) {
   return (
@@ -120,23 +206,39 @@ function MicrosoftButton({ providerId }: { providerId: string }) {
 
 /* ── Error messages for OAuth redirects ─────────────────────────────── */
 const OAUTH_ERRORS: Record<string, string> = {
-  azure_denied:          "Microsoft sign-in was cancelled.",
-  azure_auth_failed:     "Microsoft authentication failed. Please try again.",
-  state_mismatch:        "Security check failed. Please try again.",
-  company_mismatch:      "Your Microsoft account is not authorised for this organisation.",
-  auto_import_disabled:  "Your account does not exist here. Contact your administrator.",
-  account_disabled:      "Your account has been disabled. Contact your administrator.",
-  provider_not_configured: "Microsoft login is not fully configured yet.",
-  provider_unavailable:  "Microsoft login is temporarily unavailable.",
-  invalid_callback:      "Invalid login response. Please try again.",
+  azure_denied:             "Microsoft sign-in was cancelled.",
+  azure_auth_failed:        "Microsoft authentication failed. Please try again.",
+  state_mismatch:           "Security check failed. Please try again.",
+  company_mismatch:         "Your Microsoft account is not authorised for this organisation.",
+  auto_import_disabled:     "Your account does not exist here. Contact your administrator.",
+  account_disabled:         "Your account has been disabled. Contact your administrator.",
+  provider_not_configured:  "Microsoft login is not fully configured yet.",
+  provider_unavailable:     "Microsoft login is temporarily unavailable.",
+  invalid_callback:         "Invalid login response. Please try again.",
 };
+
+/* ── Divider ────────────────────────────────────────────────────────── */
+function Divider({ label }: { label: string }) {
+  return (
+    <div className="relative my-4">
+      <div className="absolute inset-0 flex items-center">
+        <div className="w-full border-t border-slate-200" />
+      </div>
+      <div className="relative flex justify-center">
+        <span className="bg-white px-2 text-xs text-slate-400">{label}</span>
+      </div>
+    </div>
+  );
+}
 
 /* ── Main login page ────────────────────────────────────────────────── */
 export default function LoginPage() {
   const [b,           setB]           = useState<PublicBranding>({});
   const [azureIds,    setAzureIds]    = useState<string[]>([]);
   const [showLocal,   setShowLocal]   = useState(true);
+  const [showLdap,    setShowLdap]    = useState(false);
   const [urlError,    setUrlError]    = useState("");
+  const [loginMode,   setLoginMode]   = useState<"local" | "ldap">("local");
 
   useEffect(() => {
     /* Parse error from OAuth redirect */
@@ -150,19 +252,19 @@ export default function LoginPage() {
       .then((data) => setB(data || {}))
       .catch(() => setB({}));
 
-    /* Load enabled providers — drives which buttons appear */
+    /* Load enabled providers — drives which buttons/forms appear */
     fetch("/api/auth/providers")
       .then((r) => (r.ok ? r.json() : { providers: [] }))
       .then((data: { providers: string[] }) => {
         const types = data.providers ?? [];
         setShowLocal(types.includes("LOCAL") || types.length === 0);
-        /* For Azure: we also need the provider IDs to build the login URL */
+        setShowLdap(types.includes("LDAP"));
       })
       .catch(() => {
         setShowLocal(true);
       });
 
-    /* Load Azure provider IDs separately for button href construction */
+    /* Load provider IDs for Azure buttons and LDAP detection */
     fetch("/api/protected/identity-providers")
       .then((r) => (r.ok ? r.json() : []))
       .then((providers: { id: string; provider_type: string; enabled: boolean }[]) => {
@@ -185,7 +287,15 @@ export default function LoginPage() {
   const primary = b.primary_color || "#0f172a";
   const appName = b.app_name || "Compliance & AMC";
 
-  const hasExternalProviders = azureIds.length > 0;
+  const hasAzure = azureIds.length > 0;
+  const hasExternalProviders = hasAzure || showLdap;
+
+  /* When only LDAP is available (no local, no Azure), default to LDAP mode */
+  useEffect(() => {
+    if (showLdap && !showLocal && !hasAzure) setLoginMode("ldap");
+  }, [showLdap, showLocal, hasAzure]);
+
+  const showModeSwitcher = showLocal && showLdap;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
@@ -223,7 +333,7 @@ export default function LoginPage() {
         )}
 
         {/* Azure AD / Microsoft buttons */}
-        {hasExternalProviders && (
+        {hasAzure && (
           <div className="space-y-2 mb-4">
             {azureIds.map((id) => (
               <MicrosoftButton key={id} providerId={id} />
@@ -231,23 +341,52 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Divider between SSO and local form */}
-        {hasExternalProviders && showLocal && (
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-xs text-slate-400">or continue with email</span>
-            </div>
+        {/* Divider between SSO buttons and credential forms */}
+        {hasExternalProviders && (showLocal || showLdap) && (
+          <Divider label="or continue with email" />
+        )}
+
+        {/* Login mode switcher — shown when both local and LDAP are available */}
+        {showModeSwitcher && (
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-5">
+            <button
+              type="button"
+              onClick={() => setLoginMode("local")}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                loginMode === "local"
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMode("ldap")}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                loginMode === "ldap"
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              Directory (LDAP)
+            </button>
           </div>
         )}
 
         {/* Local login form */}
-        {showLocal && (
+        {showLocal && (!showModeSwitcher || loginMode === "local") && (
           <LocalLoginForm
             primary={primary}
             errorFromUrl=""
+            onSuccess={() => { window.location.href = "/dashboard"; }}
+          />
+        )}
+
+        {/* LDAP login form */}
+        {showLdap && (!showModeSwitcher || loginMode === "ldap") && (
+          <LdapLoginForm
+            primary={primary}
             onSuccess={() => { window.location.href = "/dashboard"; }}
           />
         )}

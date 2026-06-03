@@ -1,0 +1,1 @@
+- [Validation + auth patterns](validation-auth-patterns.md) — validateEmail/validateRequiredString throw (don't return), requireRole is sync, checkRateLimit returns NextResponse|null
