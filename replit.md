@@ -61,6 +61,50 @@ A `Dockerfile` in the root can be used for containerised deployment.
 
 ---
 
+## Theme System (Dark / Light Mode)
+
+### How it works
+
+Theme is toggled by `BrandingContext.tsx`, which adds/removes the `.dark` class on `document.body`. `tailwind.config.ts` uses `darkMode: "class"` so all `dark:` utilities work automatically.
+
+CSS variables are defined in `app/globals.css` for both themes:
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `--bg` | `#ffffff` | `#111827` |
+| `--text` | `#111827` | `#f9fafb` |
+| `--card` | `#f9fafb` | `#1f2937` |
+| `--muted` | `#64748b` | `#94a3b8` |
+| `--border` | `#e2e8f0` | `#334155` |
+| `--input-bg` | `#ffffff` | `#0f172a` |
+| `--input-border` | `#cbd5e1` | `#334155` |
+| `--primary-color` | dynamic (branding) | dynamic (branding) |
+
+### Global override strategy
+
+Rather than adding `dark:` classes to every component individually, `globals.css` uses a CSS specificity trick:
+
+```css
+body.dark .bg-white { background-color: var(--card); }
+```
+
+`body.dark .classname` has specificity `(0,0,1,1)` which beats any single Tailwind utility `(0,0,1,0)` — so overrides win without `!important`. This covers all pages automatically:
+
+- **Backgrounds**: `bg-white`, `bg-slate-50/100/200`, `bg-gray-50/100`, opacity variants
+- **Text**: `text-slate-900/800/700/600/500` → `var(--text)` / `var(--muted)`, same for `gray-*`
+- **Borders**: `border-slate-100/200/300`, `border-gray-*` → `var(--border)`
+- **Hover states**: `hover:bg-slate-50/100/200` including opacity variants (`/60`, `/70`)
+- **Dividers**: `divide-slate-50/100/200` → `var(--border)`
+- **Status colors**: amber/red/green/blue semantic backgrounds muted; text lightened for dark
+- **Form elements**: all `input`, `textarea`, `select` use `var(--input-*)` tokens
+- **Active states**: `bg-slate-900/800` → readable rgba overlays on dark backgrounds
+
+### Toggle knobs
+
+Any toggle switch ball must use the `.toggle-knob` utility class (defined in `globals.css`) instead of `bg-white`. This keeps the knob near-white (`#f1f5f9`) in dark mode rather than going dark with the card background override.
+
+---
+
 ## Architecture
 
 ```
@@ -78,10 +122,12 @@ app/                          Next.js App Router — pages and API routes
     branding/                 Company branding (public + protected)
 
 components/
-  Sidebar.tsx                 Navigation sidebar (role + module gated)
-  Header.tsx                  Top bar with user menu and notifications
+  Sidebar.tsx                 Navigation sidebar — collapsible (icon-only mode),
+                              role + module gated, localStorage persistence
+  Header.tsx                  Top bar with user menu, notifications, theme toggle
   ClientLayout.tsx            Root layout wrapper (auth context, idle guard)
   IdleTimeoutGuard.tsx        30-min idle session warning + auto-logout
+  ThemeToggle.tsx             Light/dark mode toggle button
   storage/                    Storage provider UI component library
     types.ts                  Shared StorageProvider / StorageSettings interfaces
     provider-meta.tsx         Icons, labels, colors per provider type
@@ -98,7 +144,8 @@ components/
 
 context/
   AuthContext.tsx             Client-side auth state via React Context
-  BrandingContext.tsx         Company branding (logo, colours, name)
+  BrandingContext.tsx         Company branding (logo, colours, name); applies
+                              .dark class to document.body; toggleTheme()
 
 hooks/
   useIdleTimeout.ts           Idle detection hook (30-min window)
@@ -187,6 +234,19 @@ Admin
     ├── Audit Logs
     └── Authentication Settings
 ```
+
+---
+
+## Sidebar
+
+`components/Sidebar.tsx` — collapsible navigation sidebar:
+
+- **Expanded** (`w-56`): full labels, section headings, module icons
+- **Collapsed** (`w-16`): icon-only mode; native `title` tooltips on hover; clicking any icon auto-expands
+- **Collapse button**: fixed at the bottom-left; `< Collapse` when open, `>` arrow when closed
+- **Persistence**: collapse state saved in `localStorage` under key `sidebar-collapsed`
+- **Transition**: `transition-[width] duration-300` smooth CSS animation
+- **Styling**: dark gradient (`from-slate-900 to-slate-950`), blue active highlight with border, rounded items
 
 ---
 
@@ -312,6 +372,7 @@ AES-256-CBC symmetric encryption used for all sensitive credentials stored in th
 - **Next.js 16.1.6 is pinned** — do not upgrade to 16.2.x (known process stability issue on Node.js 24).
 - Turbopack caches the Prisma client — always restart the `Start application` workflow after running `prisma db push`.
 - The old SharePoint Settings page (`/admin/sharepoint`) exists on disk for backward compatibility but is not linked from the navigation — all SharePoint configuration is done inside Admin → Storage Providers.
+- Dark mode overrides live entirely in `app/globals.css` — do not add `dark:` classes to individual pages for neutral grays; the global specificity rules cover them automatically.
 
 ---
 
