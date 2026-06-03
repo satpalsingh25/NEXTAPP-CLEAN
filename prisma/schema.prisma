@@ -44,6 +44,13 @@ enum AuthProviderType {
   OIDC
 }
 
+enum StorageProviderType {
+  SHAREPOINT
+  GOOGLE_DRIVE
+  AWS_S3
+  AZURE_BLOB
+}
+
 model Company {
   id                   String             @id @default(uuid()) @db.Uuid
   name                 String
@@ -77,6 +84,8 @@ model Company {
   identity_providers   IdentityProvider[]
   auth_settings        CompanyAuthSettings?
   group_mappings       IdentityGroupMapping[]
+  storage_providers    StorageProvider[]
+  storage_settings     CompanyStorageSettings?
 }
 
 model Branding {
@@ -301,14 +310,17 @@ model AMC {
 }
 
 model Document {
-  id          String   @id @default(uuid()) @db.Uuid
-  company_id  String   @db.Uuid
-  company     Company  @relation(fields: [company_id], references: [id])
-  module      ModuleType
-  record_id   String   @db.Uuid
-  file_path   String
-  uploaded_by String   @db.Uuid
-  uploaded_at DateTime @default(now())
+  id                  String   @id @default(uuid()) @db.Uuid
+  company_id          String   @db.Uuid
+  company             Company  @relation(fields: [company_id], references: [id])
+  module              ModuleType
+  record_id           String   @db.Uuid
+  file_path           String
+  uploaded_by         String   @db.Uuid
+  uploaded_at         DateTime @default(now())
+  storage_provider_id String?  @db.Uuid
+  external_file_id    String?
+  external_path       String?
 }
 
 model ApprovalLog {
@@ -708,4 +720,41 @@ model IdentityGroupMapping {
 
   @@index([company_id])
   @@index([identity_provider_id])
+}
+
+/* ------------------------------------------------------------------ */
+/* StorageProvider — one row per registered storage backend per co.   */
+/* ------------------------------------------------------------------ */
+model StorageProvider {
+  id                   String              @id @default(uuid()) @db.Uuid
+  company_id           String              @db.Uuid
+  provider_type        StorageProviderType
+  name                 String
+  enabled              Boolean             @default(true)
+  is_default           Boolean             @default(false)
+  configuration_json   Json?
+  provider_identifier  String?
+  created_at           DateTime            @default(now())
+  updated_at           DateTime            @updatedAt
+
+  company              Company             @relation(fields: [company_id], references: [id])
+  default_settings     CompanyStorageSettings[]
+
+  @@index([company_id])
+}
+
+/* ------------------------------------------------------------------ */
+/* CompanyStorageSettings — one row per company storage configuration */
+/* ------------------------------------------------------------------ */
+model CompanyStorageSettings {
+  id                           String           @id @default(uuid()) @db.Uuid
+  company_id                   String           @unique @db.Uuid
+  default_provider_id          String?          @db.Uuid
+  auto_create_folder_structure Boolean          @default(true)
+  enable_external_sharing      Boolean          @default(false)
+  created_at                   DateTime         @default(now())
+  updated_at                   DateTime         @updatedAt
+
+  company                      Company          @relation(fields: [company_id], references: [id])
+  default_provider             StorageProvider? @relation(fields: [default_provider_id], references: [id])
 }

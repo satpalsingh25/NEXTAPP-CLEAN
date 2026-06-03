@@ -1,0 +1,360 @@
+# 🚀 Phase 12 — Step 1
+
+# Multi-Storage Provider Foundation
+
+## Replit Optimized Prompt
+
+```text id="p12step1prompt"
+You are working on an enterprise multi-tenant Next.js + Prisma + PostgreSQL application called NEXTAPP-CLEAN.
+
+Completed:
+- Phase 1–10
+- Phase 11 Enterprise Identity Platform
+
+Current storage:
+- SharePoint integration already exists
+- DMS / AMC / Compliance uploads currently use SharePoint
+
+DO NOT break any existing functionality.
+
+====================================================
+GOAL
+====================================================
+
+Build Phase 12 — Step 1:
+Unified Multi-Storage Provider Foundation.
+
+This step creates the architecture for:
+
+- SharePoint
+- Google Drive
+- AWS S3
+- Azure Blob
+
+DO NOT implement all providers yet.
+
+This step builds:
+- storage abstraction
+- provider architecture
+- provider factory
+- DB models
+- admin UI
+- company storage settings
+- refactor preparation
+
+====================================================
+1. CREATE STORAGE PROVIDER ENUM
+====================================================
+
+Add Prisma enum:
+
+enum StorageProviderType {
+  SHAREPOINT
+  GOOGLE_DRIVE
+  AWS_S3
+  AZURE_BLOB
+}
+
+====================================================
+2. CREATE STORAGE PROVIDER MODEL
+====================================================
+
+Create Prisma model:
+
+model StorageProvider {
+  id                    String   @id @default(uuid()) @db.Uuid
+
+  company_id            String   @db.Uuid
+
+  provider_type         StorageProviderType
+
+  name                  String
+
+  enabled               Boolean  @default(true)
+
+  is_default            Boolean  @default(false)
+
+  configuration_json    Json?
+
+  provider_identifier   String?
+
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  company               Company  @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+====================================================
+3. CREATE COMPANY STORAGE SETTINGS
+====================================================
+
+Create Prisma model:
+
+model CompanyStorageSettings {
+  id                          String   @id @default(uuid()) @db.Uuid
+
+  company_id                  String   @unique @db.Uuid
+
+  default_provider_id         String?  @db.Uuid
+
+  auto_create_folder_structure Boolean @default(true)
+
+  enable_external_sharing     Boolean  @default(false)
+
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+
+  company                     Company  @relation(fields: [company_id], references: [id])
+
+  default_provider            StorageProvider? @relation(fields: [default_provider_id], references: [id])
+}
+
+====================================================
+4. COMPANY RELATIONS
+====================================================
+
+Add relations to Company model:
+
+storage_providers      StorageProvider[]
+storage_settings       CompanyStorageSettings?
+
+====================================================
+5. EXTEND DOCUMENT MODEL
+====================================================
+
+Extend existing Document model safely.
+
+Add:
+
+storage_provider_id     String? @db.Uuid
+external_file_id        String?
+external_path           String?
+
+Rules:
+- nullable
+- safe migration
+- preserve existing SharePoint data
+
+====================================================
+6. CREATE STORAGE ARCHITECTURE
+====================================================
+
+Create folders:
+
+/lib/storage/
+/lib/storage/providers/
+/lib/storage/types.ts
+/lib/storage/factory.ts
+
+====================================================
+7. CREATE STORAGE INTERFACE
+====================================================
+
+Create interface:
+
+export interface StorageProviderInterface {
+  uploadFile(): Promise<any>
+  downloadFile(): Promise<any>
+  deleteFile(): Promise<any>
+
+  createFolder?(): Promise<any>
+  renameFile?(): Promise<any>
+  renameFolder?(): Promise<any>
+
+  generatePreviewUrl?(): Promise<any>
+  generateDownloadUrl?(): Promise<any>
+
+  testConnection?(): Promise<any>
+}
+
+====================================================
+8. CREATE PROVIDER PLACEHOLDERS
+====================================================
+
+Create placeholder classes:
+
+- SharePointStorageProvider
+- GoogleDriveStorageProvider
+- AwsS3StorageProvider
+- AzureBlobStorageProvider
+
+DO NOT implement providers fully yet.
+
+Only architecture placeholders.
+
+====================================================
+9. CREATE STORAGE FACTORY
+====================================================
+
+Create:
+
+/lib/storage/factory.ts
+
+Example:
+
+getStorageProvider(type)
+
+====================================================
+10. CREATE STORAGE SERVICE
+====================================================
+
+Create:
+
+/lib/storage/storage-service.ts
+
+This becomes unified entry point for:
+- DMS uploads
+- AMC uploads
+- Compliance uploads
+
+DO NOT fully refactor modules yet.
+
+====================================================
+11. CREATE STORAGE ADMIN MENU
+====================================================
+
+Add admin menu:
+
+Admin
+ └── Storage Providers
+
+Access:
+- SUPER_ADMIN
+- ADMIN
+
+====================================================
+12. CREATE STORAGE MANAGEMENT PAGE
+====================================================
+
+Create page:
+
+/admin/storage-providers
+
+Page sections:
+
+A. Company Storage Settings
+B. Storage Providers
+
+====================================================
+13. COMPANY STORAGE SETTINGS UI
+====================================================
+
+Add controls:
+
+- Default Storage Provider
+- Auto Create Folder Structure
+- Enable External Sharing
+
+====================================================
+14. STORAGE PROVIDER TABLE
+====================================================
+
+Columns:
+- Name
+- Provider Type
+- Status
+- Default
+- Created Date
+- Actions
+
+Actions:
+- Add
+- Edit
+- Disable
+- Test Connection
+
+====================================================
+15. PROVIDER CREATION MODAL
+====================================================
+
+Allow selecting:
+
+- SharePoint
+- Google Drive
+- AWS S3
+- Azure Blob
+
+NO provider-specific configuration yet.
+
+Only provider registration.
+
+====================================================
+16. API ROUTES
+====================================================
+
+Create secure APIs:
+
+GET    /api/protected/storage/providers
+POST   /api/protected/storage/providers
+PUT    /api/protected/storage/providers/[id]
+
+GET    /api/protected/storage/settings
+PUT    /api/protected/storage/settings
+
+Requirements:
+- Company isolation
+- Validation
+- Audit logging
+- Role protection
+
+====================================================
+17. STORAGE PREPARATION LAYER
+====================================================
+
+Create helper methods for future use:
+
+- resolveCompanyStorageProvider()
+- getDefaultStorageProvider()
+- validateProviderOwnership()
+
+====================================================
+18. AUDIT LOGGING
+====================================================
+
+Log:
+- Provider create/update/disable
+- Storage setting changes
+- Default provider changes
+
+Use existing audit system.
+
+====================================================
+19. IMPORTANT RULES
+====================================================
+
+- DO NOT break existing SharePoint integration
+- DO NOT refactor uploads yet
+- DO NOT migrate existing files yet
+- DO NOT implement Google Drive yet
+- DO NOT implement S3 yet
+- DO NOT implement Azure Blob yet
+- Only architecture + DB + UI + APIs
+
+====================================================
+20. FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Prisma generate
+- Prisma migrate
+- Typecheck
+- Existing uploads still work
+- Existing SharePoint still works
+- No TS errors
+- App boots cleanly
+
+====================================================
+21. OUTPUT
+====================================================
+
+At completion provide:
+- Models added
+- APIs added
+- UI added
+- Storage architecture summary
+- Files created
+- Future refactor notes
+```
