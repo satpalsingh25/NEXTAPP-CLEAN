@@ -95,7 +95,7 @@ export function GoogleDriveFields({
           onClick={() => onSharedDriveChange(!useSharedDrive)}
           className={`relative w-9 h-5 rounded-full transition-colors ${useSharedDrive ? "bg-[#1a73e8]" : "bg-slate-200"}`}
         >
-          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${useSharedDrive ? "left-4" : "left-0.5"}`} />
+          <div className={`absolute top-0.5 w-4 h-4 toggle-knob rounded-full shadow transition-all ${useSharedDrive ? "left-4" : "left-0.5"}`} />
         </div>
         <span className="text-xs text-slate-700">Use a Shared Drive</span>
       </label>

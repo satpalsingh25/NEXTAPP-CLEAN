@@ -1,0 +1,349 @@
+You are working on NEXTAPP-CLEAN.
+
+Current issue:
+Dark theme is broken across many pages because styles are using static colors instead of theme-aware dynamic classes.
+
+Examples:
+
+* Headers invisible in dark mode
+* Black text on dark backgrounds
+* Dropdown text only visible on hover
+* Tables unreadable
+* Cards unreadable
+* Tabs unreadable
+* Form labels hidden
+* Modal content invisible
+
+This issue exists across multiple pages/components.
+
+IMPORTANT:
+DO NOT change any backend functionality.
+DO NOT change APIs.
+DO NOT change business logic.
+DO NOT change authentication logic.
+DO NOT change database schema.
+
+This task is ONLY for fixing global theme styling architecture.
+
+====================================================
+GOAL
+====
+
+Refactor the entire frontend styling system to fully support:
+✔ Dark theme
+✔ Light theme
+✔ Dynamic branding colors
+
+Eliminate ALL static hardcoded colors.
+
+====================================================
+ROOT CAUSE
+==========
+
+Current UI likely uses:
+
+* hardcoded black text
+* hardcoded white backgrounds
+* static Tailwind classes
+* fixed inline colors
+
+Examples of problematic styles:
+
+* text-black
+* bg-white
+* border-gray-200
+* text-gray-900
+
+These break in dark mode.
+
+====================================================
+REQUIRED FIX
+============
+
+Convert ALL UI styling to theme-aware dynamic styling.
+
+====================================================
+
+1. CREATE GLOBAL THEME DESIGN SYSTEM
+   ====================================================
+
+Create centralized theme token system.
+
+Examples:
+
+Background:
+
+* bg-background
+* bg-card
+* bg-muted
+
+Text:
+
+* text-foreground
+* text-muted-foreground
+
+Border:
+
+* border-border
+
+Hover:
+
+* hover:bg-accent
+
+Inputs:
+
+* bg-input
+* text-input-foreground
+
+====================================================
+2. REMOVE STATIC COLORS
+=======================
+
+Search entire codebase for:
+
+* text-black
+* text-white
+* bg-white
+* bg-black
+* border-gray-*
+* text-gray-*
+* inline color styles
+
+Replace with theme-aware classes.
+
+====================================================
+3. FIX HEADERS GLOBALLY
+=======================
+
+Fix all:
+
+* page headers
+* section headers
+* card titles
+* table headers
+* modal headers
+
+Requirements:
+
+* visible in dark mode
+* visible in light mode
+* dynamic text color
+
+====================================================
+4. FIX DROPDOWNS GLOBALLY
+=========================
+
+Current issue:
+Dropdown text only visible on hover.
+
+Fix:
+
+* dropdown background
+* dropdown text
+* selected item colors
+* hover colors
+* focus colors
+
+Apply globally to:
+
+* Select components
+* Multi-selects
+* Search dropdowns
+* Menus
+
+====================================================
+5. FIX TABLES GLOBALLY
+======================
+
+Fix:
+
+* table headers
+* table rows
+* alternating backgrounds
+* hover states
+* pagination
+* filters
+
+Ensure readability in both themes.
+
+====================================================
+6. FIX MODALS GLOBALLY
+======================
+
+Fix:
+
+* modal background
+* title visibility
+* form labels
+* input colors
+* buttons
+* borders
+
+Ensure:
+
+* dark/light support
+* no invisible text
+
+====================================================
+7. FIX FORMS GLOBALLY
+=====================
+
+Fix:
+
+* labels
+* placeholders
+* helper text
+* validation messages
+* disabled states
+
+Ensure:
+
+* proper contrast
+* readability
+
+====================================================
+8. FIX SIDEBAR GLOBALLY
+=======================
+
+Fix:
+
+* active menu text
+* inactive menu text
+* icon colors
+* hover states
+* collapsed state
+
+Ensure:
+
+* dark/light support
+* branding compatibility
+
+====================================================
+9. FIX TABS GLOBALLY
+====================
+
+Fix:
+
+* active tab text
+* inactive tab text
+* borders
+* hover states
+* active indicator
+
+====================================================
+10. FIX CARDS GLOBALLY
+======================
+
+Fix:
+
+* card background
+* title text
+* description text
+* shadows
+* borders
+
+====================================================
+11. FIX BRANDING COMPATIBILITY
+==============================
+
+Ensure:
+
+* company branding colors work
+* custom themes work
+* branding does not break dark mode
+
+====================================================
+12. CREATE REUSABLE THEME UTILITIES
+===================================
+
+Create reusable utilities/components if needed.
+
+Examples:
+
+/lib/theme/
+
+* theme-tokens.ts
+* theme-utils.ts
+
+/components/ui/
+
+* themed-card.tsx
+* themed-table.tsx
+* themed-modal.tsx
+
+====================================================
+13. ENSURE TAILWIND DARK MODE PROPERLY CONFIGURED
+=================================================
+
+Verify:
+
+* dark class strategy
+* theme provider
+* dynamic class switching
+* persistence
+
+====================================================
+14. GLOBAL SEARCH & FIX
+=======================
+
+Search ALL pages/components for static styling.
+
+Priority areas:
+
+* Admin pages
+* Authentication Settings
+* Storage Providers
+* DMS
+* AMC
+* Compliance
+* Tables
+* Modals
+* Forms
+* Sidebar
+* Navbar
+
+====================================================
+15. IMPORTANT RULES
+===================
+
+DO NOT:
+
+* redesign functionality
+* change APIs
+* change routing
+* change business logic
+
+ONLY fix styling architecture.
+
+====================================================
+16. FINAL VALIDATION
+====================
+
+Verify:
+
+✔ All headers visible in dark mode
+✔ Dropdown text visible
+✔ Tables readable
+✔ Forms readable
+✔ Modals readable
+✔ Sidebar readable
+✔ Tabs readable
+✔ Branding works
+✔ Light mode works
+✔ Dark mode works
+✔ No static color conflicts
+✔ No TS errors
+✔ App boots cleanly
+
+====================================================
+17. OUTPUT
+==========
+
+Provide:
+
+* Files updated
+* Theme architecture summary
+* Components refactored
+* Static styles removed summary
+* Dark mode fixes summary
+* Branding compatibility summary

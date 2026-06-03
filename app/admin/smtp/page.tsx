@@ -163,7 +163,7 @@ export default function SmtpSettingsPage() {
               data-testid="toggle-smtp-secure"
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full toggle-knob shadow transition-transform ${
                   form.secure ? "translate-x-6" : "translate-x-1"
                 }`}
               />

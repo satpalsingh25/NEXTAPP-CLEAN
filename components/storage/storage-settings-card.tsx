@@ -137,7 +137,7 @@ function Toggle({
         onClick={() => onChange(!value)}
         className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${value ? "bg-blue-600" : "bg-slate-200"}`}
       >
-        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${value ? "left-6" : "left-1"}`} />
+        <div className={`absolute top-1 w-4 h-4 toggle-knob rounded-full shadow transition-all ${value ? "left-6" : "left-1"}`} />
       </div>
     </label>
   );

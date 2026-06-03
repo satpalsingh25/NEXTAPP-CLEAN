@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Custom Properties (Theme Tokens) ───────────────────────────── */
 :root {
   --primary-color:   #2563eb;
   --secondary-color: #2563eb;
@@ -11,6 +12,13 @@
   --card:   #f9fafb;
   --muted:  #64748b;
   --border: #e2e8f0;
+
+  /* Input-specific tokens */
+  --input-bg:          #ffffff;
+  --input-text:        #111827;
+  --input-border:      #cbd5e1;
+  --input-placeholder: #94a3b8;
+  --card-hover:        #f1f5f9;
 }
 
 .dark {
@@ -19,6 +27,13 @@
   --card:   #1f2937;
   --muted:  #94a3b8;
   --border: #334155;
+
+  /* Input-specific tokens */
+  --input-bg:          #0f172a;
+  --input-text:        #f1f5f9;
+  --input-border:      #334155;
+  --input-placeholder: #64748b;
+  --card-hover:        #263044;
 }
 
 html, body {
@@ -46,3 +61,219 @@ body {
 .text-app         { color: var(--text); }
 .text-muted       { color: var(--muted); }
 .border-app       { border-color: var(--border); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL DARK MODE OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════
+   Strategy: body.dark has specificity (element + class = 0,0,1,1) which
+   beats a single Tailwind utility class (0,0,1,0), so these win without
+   !important and automatically cover every page that uses static Tailwind
+   colour utilities.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── BACKGROUNDS ─────────────────────────────────────────────────────── */
+body.dark .bg-white                    { background-color: var(--card); }
+body.dark .bg-slate-50                 { background-color: var(--bg); }
+body.dark .bg-slate-100                { background-color: rgba(255,255,255,0.06); }
+body.dark .bg-slate-200                { background-color: rgba(255,255,255,0.10); }
+body.dark .bg-gray-50                  { background-color: var(--bg); }
+body.dark .bg-gray-100                 { background-color: rgba(255,255,255,0.06); }
+body.dark .bg-gray-200                 { background-color: rgba(255,255,255,0.10); }
+
+/* ── TEXT — NEUTRAL GRAYS ────────────────────────────────────────────── */
+body.dark .text-slate-950              { color: var(--text); }
+body.dark .text-slate-900              { color: var(--text); }
+body.dark .text-slate-800              { color: var(--text); }
+body.dark .text-slate-700              { color: var(--muted); }
+body.dark .text-slate-600              { color: var(--muted); }
+body.dark .text-slate-500              { color: var(--muted); }
+body.dark .text-slate-400              { color: var(--muted); opacity: 0.75; }
+body.dark .text-gray-950               { color: var(--text); }
+body.dark .text-gray-900               { color: var(--text); }
+body.dark .text-gray-800               { color: var(--text); }
+body.dark .text-gray-700               { color: var(--muted); }
+body.dark .text-gray-600               { color: var(--muted); }
+body.dark .text-gray-500               { color: var(--muted); }
+body.dark .text-gray-400               { color: var(--muted); opacity: 0.75; }
+
+/* ── BORDERS ─────────────────────────────────────────────────────────── */
+body.dark .border-slate-100            { border-color: var(--border); }
+body.dark .border-slate-200            { border-color: var(--border); }
+body.dark .border-slate-300            { border-color: var(--border); }
+body.dark .border-gray-100             { border-color: var(--border); }
+body.dark .border-gray-200             { border-color: var(--border); }
+body.dark .border-gray-300             { border-color: var(--border); }
+
+/* ── HOVER STATES — NEUTRAL ──────────────────────────────────────────── */
+body.dark .hover\:bg-slate-50:hover    { background-color: rgba(255,255,255,0.05); }
+body.dark .hover\:bg-slate-100:hover   { background-color: rgba(255,255,255,0.08); }
+body.dark .hover\:bg-white:hover       { background-color: var(--card-hover); }
+body.dark .hover\:bg-gray-50:hover     { background-color: rgba(255,255,255,0.05); }
+body.dark .hover\:bg-gray-100:hover    { background-color: rgba(255,255,255,0.08); }
+body.dark .hover\:text-slate-900:hover { color: var(--text); }
+body.dark .hover\:text-slate-700:hover { color: var(--text); }
+body.dark .hover\:text-gray-900:hover  { color: var(--text); }
+
+/* ── DIVIDE — table/list row separators ──────────────────────────────── */
+body.dark .divide-slate-100 > * + *    { border-color: var(--border); }
+body.dark .divide-slate-200 > * + *    { border-color: var(--border); }
+body.dark .divide-gray-100  > * + *    { border-color: var(--border); }
+body.dark .divide-gray-200  > * + *    { border-color: var(--border); }
+
+/* ── SEMANTIC STATUS BACKGROUNDS — muted for dark mode ───────────────── */
+body.dark .bg-amber-50                 { background-color: rgba(217,119,  6,0.12); }
+body.dark .bg-red-50                   { background-color: rgba(220, 38, 38,0.12); }
+body.dark .bg-green-50                 { background-color: rgba( 22,163, 74,0.12); }
+body.dark .bg-blue-50                  { background-color: rgba( 37, 99,235,0.12); }
+body.dark .bg-sky-50                   { background-color: rgba( 14,165,233,0.12); }
+body.dark .bg-indigo-50                { background-color: rgba( 99,102,241,0.12); }
+body.dark .bg-purple-50                { background-color: rgba(147, 51,234,0.12); }
+body.dark .bg-orange-50                { background-color: rgba(234, 88, 12,0.12); }
+body.dark .bg-teal-50                  { background-color: rgba(  0,150,136,0.12); }
+body.dark .bg-cyan-50                  { background-color: rgba(  6,182,212,0.12); }
+
+/* Badge pill backgrounds (100-shade) */
+body.dark .bg-green-100                { background-color: rgba( 22,163, 74,0.18); }
+body.dark .bg-red-100                  { background-color: rgba(220, 38, 38,0.18); }
+body.dark .bg-blue-100                 { background-color: rgba( 37, 99,235,0.18); }
+body.dark .bg-amber-100                { background-color: rgba(217,119,  6,0.18); }
+body.dark .bg-sky-100                  { background-color: rgba( 14,165,233,0.18); }
+body.dark .bg-indigo-100               { background-color: rgba( 99,102,241,0.18); }
+body.dark .bg-purple-100               { background-color: rgba(147, 51,234,0.18); }
+body.dark .bg-orange-100               { background-color: rgba(234, 88, 12,0.18); }
+body.dark .bg-teal-100                 { background-color: rgba(  0,150,136,0.18); }
+body.dark .bg-cyan-100                 { background-color: rgba(  6,182,212,0.18); }
+
+/* Status borders */
+body.dark .border-amber-200            { border-color: rgba(217,119,  6,0.35); }
+body.dark .border-red-200              { border-color: rgba(220, 38, 38,0.35); }
+body.dark .border-green-200            { border-color: rgba( 22,163, 74,0.35); }
+body.dark .border-blue-200             { border-color: rgba( 37, 99,235,0.35); }
+body.dark .border-sky-200              { border-color: rgba( 14,165,233,0.35); }
+body.dark .border-indigo-100           { border-color: rgba( 99,102,241,0.35); }
+body.dark .border-indigo-200           { border-color: rgba( 99,102,241,0.35); }
+body.dark .border-purple-200           { border-color: rgba(147, 51,234,0.35); }
+body.dark .border-orange-200           { border-color: rgba(234, 88, 12,0.35); }
+body.dark .border-teal-200             { border-color: rgba(  0,150,136,0.35); }
+
+/* Status text — lighter variants for legibility on dark backgrounds */
+body.dark .text-amber-600              { color: #fbbf24; }
+body.dark .text-amber-700              { color: #fbbf24; }
+body.dark .text-amber-800              { color: #fbbf24; }
+body.dark .text-red-600                { color: #f87171; }
+body.dark .text-red-700                { color: #f87171; }
+body.dark .text-red-800                { color: #f87171; }
+body.dark .text-green-600              { color: #4ade80; }
+body.dark .text-green-700              { color: #4ade80; }
+body.dark .text-green-800              { color: #4ade80; }
+body.dark .text-blue-600               { color: #60a5fa; }
+body.dark .text-blue-700               { color: #60a5fa; }
+body.dark .text-blue-800               { color: #60a5fa; }
+body.dark .text-sky-600                { color: #38bdf8; }
+body.dark .text-sky-700                { color: #38bdf8; }
+body.dark .text-indigo-600             { color: #818cf8; }
+body.dark .text-indigo-700             { color: #818cf8; }
+body.dark .text-purple-600             { color: #c084fc; }
+body.dark .text-purple-700             { color: #c084fc; }
+body.dark .text-orange-600             { color: #fb923c; }
+body.dark .text-orange-700             { color: #fb923c; }
+body.dark .text-teal-600               { color: #2dd4bf; }
+body.dark .text-teal-700               { color: #2dd4bf; }
+body.dark .text-cyan-600               { color: #22d3ee; }
+body.dark .text-cyan-700               { color: #22d3ee; }
+
+/* ── FORM ELEMENTS ───────────────────────────────────────────────────── */
+/* Covers inputs that have no explicit bg-* class (browser default = white) */
+body.dark input[type="text"],
+body.dark input[type="email"],
+body.dark input[type="password"],
+body.dark input[type="number"],
+body.dark input[type="url"],
+body.dark input[type="tel"],
+body.dark input[type="search"],
+body.dark input[type="date"],
+body.dark input[type="datetime-local"],
+body.dark input[type="month"],
+body.dark input[type="week"],
+body.dark input[type="time"],
+body.dark input:not([type]) {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--input-border);
+}
+
+body.dark textarea {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--input-border);
+}
+
+body.dark select {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--input-border);
+}
+
+body.dark select option {
+  background-color: var(--card);
+  color: var(--text);
+}
+
+body.dark input::placeholder,
+body.dark textarea::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1;
+}
+
+/* ── CODE / MONO BLOCKS ─────────────────────────────────────────────── */
+body.dark code {
+  background-color: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+
+/* ── SCROLLBARS ──────────────────────────────────────────────────────── */
+body.dark ::-webkit-scrollbar            { width: 6px; height: 6px; }
+body.dark ::-webkit-scrollbar-track      { background: transparent; }
+body.dark ::-webkit-scrollbar-thumb      { background: var(--border); border-radius: 3px; }
+body.dark ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── ADDITIONAL HOVER STATES ─────────────────────────────────────────── */
+body.dark .hover\:bg-slate-200:hover      { background-color: rgba(255,255,255,0.12); }
+body.dark .hover\:bg-gray-200:hover       { background-color: rgba(255,255,255,0.12); }
+
+/* Opacity-modifier variants (e.g. hover:bg-slate-50/60) */
+body.dark .hover\:bg-slate-50\/60:hover  { background-color: rgba(255,255,255,0.04); }
+body.dark .hover\:bg-slate-50\/70:hover  { background-color: rgba(255,255,255,0.05); }
+body.dark .hover\:bg-slate-100\/60:hover { background-color: rgba(255,255,255,0.06); }
+
+/* Semi-transparent white (e.g. bg-white/70 used for remarks pills) */
+body.dark .bg-white\/70                   { background-color: rgba(255,255,255,0.06); }
+body.dark .bg-white\/50                   { background-color: rgba(255,255,255,0.04); }
+body.dark .bg-white\/80                   { background-color: rgba(255,255,255,0.07); }
+body.dark .bg-white\/90                   { background-color: rgba(255,255,255,0.08); }
+
+/* ── ADDITIONAL BORDERS ──────────────────────────────────────────────── */
+body.dark .border-slate-50                { border-color: var(--border); }
+
+/* ── ADDITIONAL DIVIDE ───────────────────────────────────────────────── */
+body.dark .divide-slate-50  > * + *       { border-color: var(--border); }
+
+/* ── ACTIVE DARK STATES — slightly visible on dark backgrounds ───────── */
+/* bg-slate-900 is used for active tabs, selection bars — make them      */
+/* distinguishable from the page background in dark mode                 */
+body.dark .bg-slate-900                  { background-color: rgba(255,255,255,0.14); }
+body.dark .hover\:bg-slate-800:hover     { background-color: rgba(255,255,255,0.10); }
+body.dark .bg-slate-800                  { background-color: rgba(255,255,255,0.10); }
+
+/* ── HOVER BORDERS ───────────────────────────────────────────────────── */
+body.dark .hover\:border-slate-300:hover { border-color: rgba(255,255,255,0.25); }
+body.dark .hover\:border-gray-300:hover  { border-color: rgba(255,255,255,0.25); }
+
+/* ── TOGGLE BALL — stays near-white in dark mode ─────────────────────── */
+/* Applied as a utility class on toggle knob <span> elements            */
+.toggle-knob                              { background-color: #ffffff; }
+body.dark .toggle-knob                    { background-color: #f1f5f9; }
+
+/* ── FOCUS RING OFFSET ───────────────────────────────────────────────── */
+body.dark .focus\:ring-offset-white:focus { --tw-ring-offset-color: var(--card); }
+body.dark .focus\:ring-offset-2:focus     { --tw-ring-offset-color: var(--bg); }
