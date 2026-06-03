@@ -14,6 +14,8 @@ A self-hostable, multi-tenant **Compliance** and **Annual Maintenance Contract (
 - **Role-based visibility and actions** — user creates and submits; approver approves or rejects; admin manages templates, users, and matrices
 - **Multi-tenant isolation** — each company's data is fully separated; one deployment serves multiple organisations
 - **Full audit trail** — every workflow action is logged with actor, timestamp, and remarks
+- **Enterprise identity foundation** — pluggable authentication provider architecture supporting Local, Azure AD / Entra ID, Google Workspace, LDAP, SAML, and OIDC (Phase 11)
+- **Azure AD / Microsoft Entra ID login** — full OAuth 2.0 + OIDC flow with per-company provider config, CSRF/nonce/tenant isolation, user auto-linking, and a "Sign in with Microsoft" button on the login page
 
 ---
 
@@ -35,7 +37,7 @@ The seed script runs automatically on startup and creates the Default Company, a
 | Language | TypeScript |
 | Database | PostgreSQL 16 |
 | ORM | Prisma v6 |
-| Auth | JWT (`jsonwebtoken`) in HttpOnly cookies |
+| Auth | JWT (`jsonwebtoken`) in HttpOnly cookies; Azure AD via OAuth 2.0 / OIDC |
 | Password hashing | bcryptjs (cost factor 10; 12 for password reset) |
 | Email | nodemailer |
 | Scheduling | node-cron |
@@ -140,11 +142,15 @@ The container automatically runs `prisma db push` then starts the server.
 
 ```
 app/                    Next.js App Router — pages and API routes
+  api/auth/             Login, logout, forgot/reset-password, Azure AD OAuth routes
+  api/protected/        Company-scoped ADMIN_ONLY APIs
+  admin/                Admin UI pages (users, settings, authentication, etc.)
 components/             Shared React components (Sidebar, Header, ClientLayout)
 context/AuthContext.tsx Client-side auth state via React Context
 hooks/                  Custom React hooks (useIdleTimeout)
 proxy.ts                Route-level auth middleware — guards /dashboard, /compliance, /amc, /admin
 lib/                    Server utilities (Prisma, auth, seed, cron, DMS, storage, security)
+  auth-providers/       Identity provider architecture (factory + 6 provider classes)
 prisma/schema.prisma    Full database schema
 instrumentation.ts      Runs seed + starts cron on startup (Node.js runtime only)
 scripts/                Utility scripts (seed-modules, reset-admin, fix-folder-paths)
@@ -318,6 +324,50 @@ Every JWT carries `user_id`, `company_id`, `role`, and `session_id`. All databas
 
 ---
 
+### 10 — Enterprise Identity Foundation (Phase 11)
+
+#### Architecture
+
+An `AuthProviderType` enum (`LOCAL`, `AZURE_AD`, `GOOGLE_WORKSPACE`, `LDAP`, `SAML`, `OIDC`) drives a pluggable provider system in `lib/auth-providers/`. All future SSO integrations extend the same `IdentityAuthProvider` interface via `getAuthProvider(type)` factory. Existing local users are unaffected — `auth_provider` defaults to `LOCAL`.
+
+#### Azure AD / Microsoft Entra ID Login (active)
+
+| Step | Detail |
+|------|--------|
+| Config | Admin adds provider in **Admin → Authentication Settings** with Tenant ID, Client ID, Client Secret, Redirect URI |
+| Initiation | `GET /api/auth/azure/login?provider_id=…` generates `state` + `nonce` HttpOnly cookies, redirects to Microsoft |
+| Callback | `GET /api/auth/azure/callback` validates state (CSRF), exchanges code, validates `id_token` signature via Microsoft JWKS, checks `tid` (tenant), checks `nonce` (replay), links or auto-creates user |
+| Session | Same JWT + `UserSession` flow as local login (`lib/auth-session.ts`) |
+| Login page | "Sign in with Microsoft" button appears dynamically when an Azure provider is configured and enabled |
+
+**Security controls:**
+
+| Threat | Defence |
+|--------|---------|
+| CSRF | `state` cookie validated byte-for-byte before token exchange |
+| Replay attack | `nonce` in cookie compared against `id_token` claim |
+| Cross-tenant login | `tid` claim in token must match `IdentityProvider.tenant_id` |
+| Cross-company login | `user.company_id` must equal `provider.company_id` |
+| Secret exposure | `client_secret` never returned in any GET response; masked in edit form |
+
+**Microsoft app registration checklist:**
+
+1. Azure Portal → **App registrations → New registration**
+2. Add Redirect URI (Web): `https://your-domain/api/auth/azure/callback`
+3. Copy **Application (client) ID** and **Directory (tenant) ID**
+4. **Certificates & secrets → New client secret** — copy the secret *value*
+5. **API permissions → Microsoft Graph → Delegated**: `openid`, `profile`, `email`, `User.Read` → Grant admin consent
+6. In Admin → Authentication Settings → **Add Azure AD** → fill form → Test Connection → Save
+
+#### Admin UI — Authentication Settings
+
+- **Login method toggles** — enable/disable Local, Azure AD, Google, LDAP, SAML, OIDC per company
+- **User sync toggles** — Auto Import External Users / Auto Disable Removed Users
+- **Identity Providers table** — list, edit, enable/disable configured providers
+- **Test Connection** — validates Azure tenant via OpenID metadata endpoint before saving
+
+---
+
 ## Approval Workflow
 
 ```
@@ -368,6 +418,9 @@ Level N Approver reviews the same way
 | `Module` | Master list of gateable modules (AMC, COMPLIANCE, DMS) |
 | `CompanyModule` | Per-tenant enable/disable flag |
 | `Branding` | Per-tenant branding — logo, colors, login page, theme |
+| `IdentityProvider` | Per-company external auth provider config — `client_id`, `tenant_id`, `redirect_uri`, `scopes`; `client_secret` write-only |
+| `CompanyAuthSettings` | Per-company login method toggles (local/azure/google/ldap/saml/oidc) + auto-provisioning flags |
+| `User` (extended) | `auth_provider` (default LOCAL), `external_user_id` (Azure OID), `is_external_user` |
 
 ---
 
@@ -405,26 +458,42 @@ Admins always receive `FULL_ACCESS` — no permission rows needed.
 
 ```
 lib/
-├── api-response.ts     errorResponse / successResponse / generateRequestId / SP_ERRORS
-├── error-log.ts        logInternalError / logSecurityEvent — structured stderr, never to client
-├── auth.server.ts      requireAuth / requireRole / ADMIN_ONLY / APPROVER_PLUS / SUBMIT_ROLES
-├── audit-log.ts        logAudit() — fire-and-forget AuditLog helper
-├── rate-limit.ts       Sliding-window rate limiter (5 presets)
-├── validation.ts       validateEmail / validateUUID / validateFileName / sanitizeText
-├── module-access.ts    gateModule() — multi-tenant feature gating
-├── dms-permission.ts   checkFolderAccess() — resolves ACL flags
-├── dms-company-root.ts ensureCompanyRootFolder() — idempotent SharePoint root creation
-├── dms-folder-path.ts  buildFolderPath() — single source of truth for all DMS paths
-├── sharepoint-check.ts SP token / drive ID / folder create helpers
-├── smtp-crypto.ts      AES-256-CBC encrypt/decrypt for SMTP passwords
-├── email.ts            nodemailer wrapper
-├── notification.ts     DB + email notification helper
-├── cron.ts             node-cron scheduler (daily at 01:00)
-├── seed.ts             Idempotent database seed
-├── generator.ts        Recurring record generator
-├── overdue.ts          Bulk overdue status updater
-├── reminder.ts         Due-date reminder engine
-└── escalation.ts       Escalation engine
+├── api-response.ts        errorResponse / successResponse / generateRequestId / SP_ERRORS
+├── error-log.ts           logInternalError / logSecurityEvent — structured stderr, never to client
+├── auth.server.ts         requireAuth / requireRole / ADMIN_ONLY / APPROVER_PLUS / SUBMIT_ROLES
+├── auth-session.ts        createSessionResponse() — shared JWT + UserSession creation for all login routes
+├── audit-log.ts           logAudit() — fire-and-forget AuditLog helper
+├── rate-limit.ts          Sliding-window rate limiter (5 presets)
+├── validation.ts          validateEmail / validateUUID / validateFileName / sanitizeText
+├── module-access.ts       gateModule() — multi-tenant feature gating
+├── dms-permission.ts      checkFolderAccess() — resolves ACL flags
+├── dms-company-root.ts    ensureCompanyRootFolder() — idempotent SharePoint root creation
+├── dms-folder-path.ts     buildFolderPath() — single source of truth for all DMS paths
+├── sharepoint-check.ts    SP token / drive ID / folder create helpers
+├── smtp-crypto.ts         AES-256-CBC encrypt/decrypt for SMTP passwords
+├── email.ts               nodemailer wrapper
+├── notification.ts        DB + email notification helper
+├── cron.ts                node-cron scheduler (daily at 01:00)
+├── seed.ts                Idempotent database seed
+├── generator.ts           Recurring record generator
+├── overdue.ts             Bulk overdue status updater
+├── reminder.ts            Due-date reminder engine
+├── escalation.ts          Escalation engine
+└── auth-providers/
+    ├── types.ts            IdentityAuthProvider interface
+    ├── factory.ts          getAuthProvider(AuthProviderType) — returns provider instance
+    └── providers/
+        ├── local.ts         LocalAuthProvider
+        ├── azure-ad.ts      AzureAdProvider (active — full OAuth 2.0 / OIDC)
+        ├── google-workspace.ts  GoogleWorkspaceProvider (placeholder)
+        ├── ldap.ts          LdapProvider (placeholder)
+        ├── saml.ts          SamlProvider (placeholder)
+        └── oidc.ts          OidcProvider (placeholder)
+
+lib/auth-providers/azure-ad-client.ts
+    buildAuthUrl / exchangeCodeForTokens / validateIdToken (JWKS via Node built-in crypto)
+    testAzureConnection — validates tenant via OpenID metadata endpoint
+    JWKS cache (1-hour TTL, auto-refreshed on key rotation)
 ```
 
 ---
