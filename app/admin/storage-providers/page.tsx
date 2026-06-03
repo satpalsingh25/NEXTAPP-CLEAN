@@ -1,881 +1,233 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
-import {
-  HardDrive, Plus, X, Loader2, CheckCircle, XCircle,
-  Pencil, Ban, Eye, RefreshCw, Star, StarOff, Zap,
-  Cloud, Server, Database, Box, ExternalLink, Info,
-} from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { HardDrive, HelpCircle, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
-/* ── Types ──────────────────────────────────────────────────────────── */
-type ProviderType = "SHAREPOINT" | "GOOGLE_DRIVE" | "AWS_S3" | "AZURE_BLOB";
+import { StorageSettingsCard }  from "@/components/storage/storage-settings-card";
+import { StorageProviderTable } from "@/components/storage/storage-provider-table";
+import { ProviderTypeSelector } from "@/components/storage/provider-type-selector";
+import { StorageProviderModal } from "@/components/storage/storage-provider-modal";
+import { StorageHelpTab }       from "@/components/storage/storage-help-tab";
+import type { StorageProvider, StorageSettings, ProviderType } from "@/components/storage/types";
 
-interface StorageProvider {
-  id: string;
-  name: string;
-  provider_type: ProviderType;
-  enabled: boolean;
-  is_default: boolean;
-  configuration_json: Record<string, unknown> | null;
-  provider_identifier: string | null;
-  created_at: string;
-  updated_at: string;
+type Tab = "providers" | "help";
+
+interface Banner {
+  type:    "success" | "error" | "info";
+  message: string;
 }
 
-interface StorageSettings {
-  id: string;
-  company_id: string;
-  default_provider_id: string | null;
-  auto_create_folder_structure: boolean;
-  enable_external_sharing: boolean;
-}
-
-/* ── Provider meta ───────────────────────────────────────────────────── */
-const PROVIDER_META: Record<ProviderType, { label: string; icon: React.ReactNode; color: string; bg: string; description: string }> = {
-  SHAREPOINT: {
-    label: "SharePoint",
-    icon: <Cloud className="h-5 w-5" />,
-    color: "text-[#0078d4]",
-    bg: "bg-[#0078d4]/10",
-    description: "Microsoft SharePoint / OneDrive via Graph API",
-  },
-  GOOGLE_DRIVE: {
-    label: "Google Drive",
-    icon: <HardDrive className="h-5 w-5" />,
-    color: "text-[#1a73e8]",
-    bg: "bg-[#1a73e8]/10",
-    description: "Google Drive via Google Drive API",
-  },
-  AWS_S3: {
-    label: "AWS S3",
-    icon: <Box className="h-5 w-5" />,
-    color: "text-[#ff9900]",
-    bg: "bg-[#ff9900]/10",
-    description: "Amazon S3 object storage",
-  },
-  AZURE_BLOB: {
-    label: "Azure Blob",
-    icon: <Database className="h-5 w-5" />,
-    color: "text-[#0089d6]",
-    bg: "bg-[#0089d6]/10",
-    description: "Azure Blob Storage",
-  },
-};
-
-const IMPLEMENTED = new Set<ProviderType>(["SHAREPOINT", "GOOGLE_DRIVE"]);
-
-/* ── Add / Edit Modal ───────────────────────────────────────────────── */
-interface ProviderModalProps {
-  editProvider: StorageProvider | null;
-  onClose: () => void;
-  onSaved: () => void;
-}
-
-function ProviderModal({ editProvider, onClose, onSaved }: ProviderModalProps) {
-  const [name,               setName]              = useState(editProvider?.name ?? "");
-  const [providerType,       setProviderType]       = useState<ProviderType>(editProvider?.provider_type ?? "SHAREPOINT");
-  const [providerIdentifier, setProviderIdentifier] = useState(editProvider?.provider_identifier ?? "");
-  const [isDefault,          setIsDefault]          = useState(editProvider?.is_default ?? false);
-  const [saving,             setSaving]             = useState(false);
-  const [error,              setError]              = useState("");
-
-  /* ── Google Drive state ─────────────────────────────────────────── */
-  const [gdClientId,        setGdClientId]        = useState("");
-  const [gdClientSecret,    setGdClientSecret]    = useState("");   // plain; only sent if entered
-  const [gdDriveId,         setGdDriveId]         = useState("");
-  const [gdRootFolderId,    setGdRootFolderId]    = useState("");
-  const [gdUseSharedDrive,  setGdUseSharedDrive]  = useState(false);
-  const [gdConnected,       setGdConnected]       = useState(false);
-  const [gdConnecting,      setGdConnecting]      = useState(false);
-
-  useEffect(() => {
-    if (editProvider?.provider_type === "GOOGLE_DRIVE" && editProvider.configuration_json) {
-      const cfg = editProvider.configuration_json as Record<string, unknown>;
-      setGdClientId(String(cfg.client_id      ?? ""));
-      setGdDriveId(String(cfg.drive_id        ?? ""));
-      setGdRootFolderId(String(cfg.root_folder_id ?? ""));
-      setGdUseSharedDrive(Boolean(cfg.use_shared_drive));
-      setGdConnected(!!(cfg as Record<string, unknown>).has_refresh_token);
-    }
-  }, [editProvider]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!name.trim()) { setError("Name is required."); return; }
-
-    setSaving(true);
-    try {
-      const url    = editProvider
-        ? `/api/protected/storage/providers/${editProvider.id}`
-        : "/api/protected/storage/providers";
-      const method = editProvider ? "PUT" : "POST";
-
-      const body: Record<string, unknown> = {
-        name:                name.trim(),
-        provider_type:       providerType,
-        provider_identifier: providerIdentifier.trim() || null,
-        is_default:          isDefault,
-      };
-
-      if (providerType === "GOOGLE_DRIVE") {
-        const gdConfig: Record<string, unknown> = {
-          client_id:        gdClientId,
-          drive_id:         gdDriveId         || null,
-          root_folder_id:   gdRootFolderId    || null,
-          use_shared_drive: gdUseSharedDrive,
-        };
-        if (gdClientSecret) gdConfig.client_secret = gdClientSecret;
-        body.configuration_json = gdConfig;
-      }
-
-      const res  = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Save failed."); return; }
-      onSaved();
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /* ── Save credentials then redirect to Google OAuth ─────────────── */
-  const handleGDConnect = async () => {
-    if (!editProvider) return;
-    setError("");
-    setGdConnecting(true);
-    try {
-      const gdConfig: Record<string, unknown> = {
-        client_id:        gdClientId,
-        drive_id:         gdDriveId      || null,
-        root_folder_id:   gdRootFolderId || null,
-        use_shared_drive: gdUseSharedDrive,
-      };
-      if (gdClientSecret) gdConfig.client_secret = gdClientSecret;
-
-      const saveRes = await fetch(`/api/protected/storage/providers/${editProvider.id}`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ configuration_json: gdConfig }),
-      });
-      if (!saveRes.ok) {
-        const d = await saveRes.json();
-        setError(d.error ?? "Failed to save credentials. Please try again.");
-        setGdConnecting(false);
-        return;
-      }
-      window.location.href =
-        `/api/protected/storage/google/connect?provider_id=${editProvider.id}`;
-    } catch {
-      setError("Network error. Please try again.");
-      setGdConnecting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h2 className="text-base font-semibold text-slate-800">
-            {editProvider ? "Edit Storage Provider" : "Add Storage Provider"}
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
-              <XCircle className="h-4 w-4 shrink-0" /> {error}
-            </div>
-          )}
-
-          {/* Provider type — only for new providers */}
-          {!editProvider && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Provider Type</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.entries(PROVIDER_META) as [ProviderType, typeof PROVIDER_META[ProviderType]][]).map(([type, meta]) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setProviderType(type)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
-                      providerType === type
-                        ? `border-blue-500 ${meta.bg} ${meta.color} font-medium`
-                        : "border-slate-200 text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    <span className={providerType === type ? meta.color : "text-slate-400"}>{meta.icon}</span>
-                    {meta.label}
-                    {!IMPLEMENTED.has(type) && (
-                      <span className="ml-auto text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Soon</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-1.5 text-xs text-slate-500">{PROVIDER_META[providerType].description}</p>
-            </div>
-          )}
-
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Display Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={`e.g. Production ${PROVIDER_META[providerType].label}`}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Provider Identifier (optional) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Identifier <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
-            <input
-              value={providerIdentifier}
-              onChange={(e) => setProviderIdentifier(e.target.value)}
-              placeholder={
-                providerType === "SHAREPOINT"  ? "e.g. tenant-name.sharepoint.com"
-                : providerType === "AWS_S3"    ? "e.g. my-bucket-name"
-                : providerType === "AZURE_BLOB"? "e.g. mystorageaccount"
-                : "e.g. optional label"
-              }
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Set as default */}
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div
-              onClick={() => setIsDefault((v) => !v)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${isDefault ? "bg-blue-600" : "bg-slate-200"}`}
-            >
-              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${isDefault ? "left-5" : "left-0.5"}`} />
-            </div>
-            <span className="text-sm text-slate-700">Set as default provider</span>
-          </label>
-
-          {/* ── SharePoint credentials info ──────────────────────────── */}
-          {providerType === "SHAREPOINT" && (
-            <div className="bg-[#0078d4]/5 border border-[#0078d4]/20 rounded-xl px-4 py-3 space-y-2">
-              <div className="flex items-center gap-2 text-[#0078d4]">
-                <Info className="h-4 w-4 shrink-0" />
-                <p className="text-xs font-semibold">SharePoint Credentials</p>
-              </div>
-              <p className="text-xs text-slate-600">
-                Tenant ID, Client ID, Client Secret, Site URL, and Document Library are
-                managed in <strong>SharePoint Settings</strong> and are encrypted at rest.
-              </p>
-              {editProvider?.configuration_json &&
-                !!(editProvider.configuration_json as Record<string, unknown>).site_url_preview && (
-                  <p className="text-xs text-slate-500 font-mono truncate">
-                    Site: {String((editProvider.configuration_json as Record<string, unknown>).site_url_preview)}
-                  </p>
-              )}
-              <Link href="/admin/sharepoint"
-                className="inline-flex items-center gap-1 text-xs text-[#0078d4] hover:underline font-medium">
-                Configure SharePoint Credentials <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
-
-          {/* ── Google Drive configuration ───────────────────────────── */}
-          {providerType === "GOOGLE_DRIVE" && (
-            <div className="bg-[#1a73e8]/5 border border-[#1a73e8]/20 rounded-xl px-4 py-4 space-y-3">
-              <div className="flex items-center gap-2 text-[#1a73e8]">
-                <Info className="h-4 w-4 shrink-0" />
-                <p className="text-xs font-semibold">Google Drive OAuth Credentials</p>
-              </div>
-              <p className="text-xs text-slate-500">
-                Create a project in <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer"
-                  className="underline">Google Cloud Console</a>, enable the Drive API, create an OAuth 2.0 Client ID
-                (Web application), and paste the credentials below.
-              </p>
-
-              {/* Client ID */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Client ID</label>
-                <input
-                  value={gdClientId}
-                  onChange={(e) => setGdClientId(e.target.value)}
-                  placeholder="e.g. 1234567890-abc.apps.googleusercontent.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-                />
-              </div>
-
-              {/* Client Secret */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Client Secret{editProvider && <span className="text-slate-400 font-normal"> (leave blank to keep current)</span>}
-                </label>
-                <input
-                  type="password"
-                  value={gdClientSecret}
-                  onChange={(e) => setGdClientSecret(e.target.value)}
-                  placeholder={editProvider ? "••••••••" : "Paste your client secret"}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-                />
-              </div>
-
-              {/* Shared Drive toggle */}
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <div
-                  onClick={() => setGdUseSharedDrive((v) => !v)}
-                  className={`relative w-9 h-5 rounded-full transition-colors ${gdUseSharedDrive ? "bg-[#1a73e8]" : "bg-slate-200"}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${gdUseSharedDrive ? "left-4" : "left-0.5"}`} />
-                </div>
-                <span className="text-xs text-slate-700">Use a Shared Drive</span>
-              </label>
-
-              {/* Shared Drive ID */}
-              {gdUseSharedDrive && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Shared Drive ID</label>
-                  <input
-                    value={gdDriveId}
-                    onChange={(e) => setGdDriveId(e.target.value)}
-                    placeholder="e.g. 0ANxxxxxxxxxx"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-                  />
-                  <p className="mt-0.5 text-[10px] text-slate-400">
-                    Found in the Drive URL: drive.google.com/drive/u/0/folders/<em>DRIVE_ID</em>
-                  </p>
-                </div>
-              )}
-
-              {/* Root folder ID */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Root Folder ID <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  value={gdRootFolderId}
-                  onChange={(e) => setGdRootFolderId(e.target.value)}
-                  placeholder="Leave blank to upload to My Drive / Shared Drive root"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-                />
-              </div>
-
-              {/* Google Account connect button — only for existing providers */}
-              {editProvider && (
-                <div className="mt-1 pt-3 border-t border-[#1a73e8]/20">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium text-slate-700">Google Account</p>
-                      {gdConnected
-                        ? <p className="text-xs text-green-600 mt-0.5">✓ Connected (refresh token stored)</p>
-                        : <p className="text-xs text-amber-600 mt-0.5">Not yet connected — click to authorise</p>
-                      }
-                    </div>
-                    <button
-                      type="button"
-                      disabled={gdConnecting || !gdClientId}
-                      onClick={handleGDConnect}
-                      className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg bg-[#1a73e8] text-white hover:bg-[#1558b0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-                    >
-                      {gdConnecting
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <ExternalLink className="h-3.5 w-3.5" />}
-                      {gdConnected ? "Reconnect" : "Connect Google Account"}
-                    </button>
-                  </div>
-                  {!gdClientId && (
-                    <p className="mt-1.5 text-[10px] text-slate-400">Enter a Client ID above to enable the connect button.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!IMPLEMENTED.has(providerType) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-              <strong>{PROVIDER_META[providerType].label}</strong> is registered in the architecture but full
-              configuration and uploads will be available in a future phase.
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {editProvider ? "Save Changes" : "Add Provider"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ── Main Page ──────────────────────────────────────────────────────── */
 export default function StorageProvidersPage() {
-  const [providers,    setProviders]    = useState<StorageProvider[]>([]);
-  const [settings,     setSettings]    = useState<StorageSettings | null>(null);
-  const [loading,      setLoading]     = useState(true);
-  const [error,        setError]       = useState("");
-  const [showModal,    setShowModal]   = useState(false);
-  const [editProvider, setEditProvider]= useState<StorageProvider | null>(null);
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [settingsSaved, setSettingsSaved]   = useState(false);
-  const [testingId,    setTestingId]   = useState<string | null>(null);
-  const [testResult,   setTestResult]  = useState<{ id: string; ok: boolean; message: string } | null>(null);
-  const [actionError,  setActionError] = useState("");
-  const [gdBanner,     setGdBanner]    = useState<{ type: "success" | "error"; message: string } | null>(null);
+  /* ── Data ───────────────────────────────────────────────────── */
+  const [providers, setProviders] = useState<StorageProvider[]>([]);
+  const [settings,  setSettings]  = useState<StorageSettings | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  /* Detect gd_connected / gd_error URL params after OAuth redirect */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const gdOk  = params.get("gd_connected");
-    const gdErr = params.get("gd_error");
-    const ERRS: Record<string, string> = {
-      token_exchange_failed: "Token exchange with Google failed. Please try again.",
-      no_refresh_token:      "No refresh token returned — ensure you granted access.",
-      state_mismatch:        "Security state mismatch. Please try again.",
-      missing_credentials:   "Missing credentials. Save client ID and secret first.",
-      access_denied:         "Access was denied. Please grant the required Drive permissions.",
-    };
-    if (gdOk === "true") {
-      setGdBanner({ type: "success", message: "Google Drive connected! You can now test the connection." });
-    } else if (gdErr) {
-      setGdBanner({ type: "error", message: ERRS[gdErr] ?? `Connection failed: ${gdErr}` });
-    }
-    if (gdOk || gdErr) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
+  /* ── UI ─────────────────────────────────────────────────────── */
+  const [tab,    setTab]    = useState<Tab>("providers");
+  const [banner, setBanner] = useState<Banner | null>(null);
 
-  const [draftSettings, setDraftSettings] = useState<{
-    default_provider_id: string;
-    auto_create_folder_structure: boolean;
-    enable_external_sharing: boolean;
-  }>({ default_provider_id: "", auto_create_folder_structure: true, enable_external_sharing: false });
+  /* ── Modal ──────────────────────────────────────────────────── */
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [selectedType,     setSelectedType]     = useState<ProviderType | null>(null);
+  const [editProvider,     setEditProvider]     = useState<StorageProvider | null>(null);
+  const [showModal,        setShowModal]        = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  /* ── Load ───────────────────────────────────────────────────── */
+  const loadData = useCallback(async () => {
+    setLoadError("");
     try {
-      const [pRes, sRes] = await Promise.all([
+      const [prvRes, setRes] = await Promise.all([
         fetch("/api/protected/storage/providers"),
         fetch("/api/protected/storage/settings"),
       ]);
-      if (!pRes.ok || !sRes.ok) throw new Error("Failed to load storage data.");
-      const pData = await pRes.json();
-      const sData = await sRes.json();
-      const provList: StorageProvider[] = pData.data ?? pData;
-      const sett: StorageSettings       = sData.data ?? sData;
-      setProviders(provList);
-      setSettings(sett);
-      setDraftSettings({
-        default_provider_id:          sett.default_provider_id ?? "",
-        auto_create_folder_structure: sett.auto_create_folder_structure,
-        enable_external_sharing:      sett.enable_external_sharing,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load data.");
+      if (prvRes.ok) {
+        const d = await prvRes.json();
+        setProviders(Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : []);
+      }
+      if (setRes.ok) {
+        const d = await setRes.json();
+        setSettings(d.data ?? d);
+      }
+    } catch {
+      setLoadError("Failed to load storage data. Please refresh.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  const handleSaveSettings = async () => {
-    setSavingSettings(true);
-    setActionError("");
-    try {
-      const res = await fetch("/api/protected/storage/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          default_provider_id:          draftSettings.default_provider_id || null,
-          auto_create_folder_structure: draftSettings.auto_create_folder_structure,
-          enable_external_sharing:      draftSettings.enable_external_sharing,
-        }),
-      });
-      if (!res.ok) { const d = await res.json(); setActionError(d.error ?? "Save failed."); return; }
-      await load();
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 2500);
-    } catch {
-      setActionError("Network error.");
-    } finally {
-      setSavingSettings(false);
+  /* ── OAuth redirect banners ─────────────────────────────────── */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp          = new URLSearchParams(window.location.search);
+    const connected   = sp.get("gd_connected");
+    const gdError     = sp.get("gd_error");
+    if (connected === "true") {
+      setBanner({ type: "success", message: "Google account connected successfully. The refresh token has been saved." });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (gdError) {
+      const msgs: Record<string, string> = {
+        no_provider_id:  "No provider ID in the OAuth state.",
+        no_code:         "Google did not return an authorisation code.",
+        exchange_failed: "Token exchange with Google failed. Please try again.",
+        save_failed:     "Connected to Google but failed to save the refresh token.",
+        missing_config:  "Provider credentials missing. Please save Client ID and Secret first.",
+      };
+      setBanner({ type: "error", message: msgs[gdError] ?? `OAuth error: ${gdError}` });
+      window.history.replaceState({}, "", window.location.pathname);
     }
+  }, []);
+
+  /* ── Modal helpers ──────────────────────────────────────────── */
+  const handleAddProvider = () => setShowTypeSelector(true);
+
+  const handleTypeSelected = (type: ProviderType) => {
+    setSelectedType(type);
+    setEditProvider(null);
+    setShowTypeSelector(false);
+    setShowModal(true);
   };
 
-  const handleToggle = async (provider: StorageProvider) => {
-    setActionError("");
-    try {
-      const res = await fetch(`/api/protected/storage/providers/${provider.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !provider.enabled }),
-      });
-      if (!res.ok) { const d = await res.json(); setActionError(d.error ?? "Action failed."); return; }
-      await load();
-    } catch {
-      setActionError("Network error.");
-    }
+  const handleEditProvider = (p: StorageProvider) => {
+    setEditProvider(p);
+    setSelectedType(p.provider_type);
+    setShowModal(true);
   };
 
-  const handleSetDefault = async (provider: StorageProvider) => {
-    setActionError("");
-    try {
-      const res = await fetch(`/api/protected/storage/providers/${provider.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_default: true }),
-      });
-      if (!res.ok) { const d = await res.json(); setActionError(d.error ?? "Action failed."); return; }
-      await load();
-    } catch {
-      setActionError("Network error.");
-    }
+  const handleModalClose = () => {
+    setShowModal(false);
+    setEditProvider(null);
+    setSelectedType(null);
   };
 
-  const handleTestConnection = async (provider: StorageProvider) => {
-    setTestingId(provider.id);
-    setTestResult(null);
-    try {
-      const res = await fetch(`/api/protected/storage/providers/${provider.id}`, { method: "POST" });
-      const data = await res.json();
-      const result = data.data ?? data;
-      setTestResult({ id: provider.id, ok: result.ok, message: result.message });
-    } catch {
-      setTestResult({ id: provider.id, ok: false, message: "Network error during test." });
-    } finally {
-      setTestingId(null);
-    }
+  const handleModalSaved = () => {
+    handleModalClose();
+    loadData();
+    setBanner({ type: "success", message: "Storage provider saved successfully." });
+    setTimeout(() => setBanner(null), 3500);
   };
 
+  /* ── Banner config ──────────────────────────────────────────── */
+  const bannerStyles: Record<Banner["type"], string> = {
+    success: "bg-green-50 border-green-200 text-green-800",
+    error:   "bg-red-50   border-red-200   text-red-800",
+    info:    "bg-blue-50  border-blue-200  text-blue-800",
+  };
+
+  const BannerIcon = ({ type }: { type: Banner["type"] }) =>
+    type === "success" ? <CheckCircle className="h-4 w-4 shrink-0" />
+    : type === "error"  ? <XCircle     className="h-4 w-4 shrink-0" />
+    :                     <AlertCircle className="h-4 w-4 shrink-0" />;
+
+  /* ── Tab config ─────────────────────────────────────────────── */
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "providers", label: "Providers", icon: <HardDrive className="h-4 w-4" /> },
+    { id: "help",      label: "Help",      icon: <HelpCircle className="h-4 w-4" /> },
+  ];
+
+  /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-50 rounded-xl">
-            <HardDrive className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">Storage Providers</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Configure and manage file storage backends for your company.</p>
-          </div>
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
+
+      {/* Page heading */}
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 bg-blue-50 rounded-xl">
+          <HardDrive className="h-5 w-5 text-blue-600" />
         </div>
-        <button onClick={() => { setEditProvider(null); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors shrink-0">
-          <Plus className="h-4 w-4" /> Add Provider
-        </button>
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Storage Providers</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage cloud storage backends used for document uploads.
+          </p>
+        </div>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-          <XCircle className="h-4 w-4 shrink-0" /> {error}
-          <button onClick={load} className="ml-auto flex items-center gap-1 text-red-600 hover:text-red-800">
-            <RefreshCw className="h-3.5 w-3.5" /> Retry
-          </button>
-        </div>
-      )}
-
-      {actionError && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-          <XCircle className="h-4 w-4 shrink-0" /> {actionError}
-        </div>
-      )}
-
-      {gdBanner && (
-        <div className={`flex items-center gap-2 px-4 py-3 text-sm rounded-xl border ${
-          gdBanner.type === "success"
-            ? "bg-green-50 border-green-200 text-green-700"
-            : "bg-red-50 border-red-200 text-red-700"
-        }`}>
-          {gdBanner.type === "success"
-            ? <CheckCircle className="h-4 w-4 shrink-0" />
-            : <XCircle className="h-4 w-4 shrink-0" />}
-          {gdBanner.message}
-          <button onClick={() => setGdBanner(null)} className="ml-auto opacity-60 hover:opacity-100">
+      {/* Global banner */}
+      {banner && (
+        <div className={`flex items-start gap-2 border rounded-xl px-4 py-3 text-sm ${bannerStyles[banner.type]}`}>
+          <BannerIcon type={banner.type} />
+          <span className="flex-1">{banner.message}</span>
+          <button onClick={() => setBanner(null)} className="opacity-60 hover:opacity-100">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
+      {/* Load error */}
+      {loadError && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <XCircle className="h-4 w-4 shrink-0" /> {loadError}
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              tab === t.id
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading skeleton */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-2xl h-36 animate-pulse" />
+          ))}
         </div>
       ) : (
         <>
-          {/* ── Section A: Company Storage Settings ─────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-800">Company Storage Settings</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Global storage preferences for this company.</p>
-              </div>
-              <button onClick={handleSaveSettings} disabled={savingSettings}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 transition-colors">
-                {savingSettings
-                  ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
-                  : settingsSaved
-                    ? <><CheckCircle className="h-3 w-3" /> Saved</>
-                    : "Save Settings"}
-              </button>
+          {/* ── Providers tab ─────────────────────────────── */}
+          {tab === "providers" && (
+            <div className="space-y-4 sm:space-y-6">
+              <StorageSettingsCard
+                settings={settings}
+                providers={providers}
+                onSaved={loadData}
+              />
+              <StorageProviderTable
+                providers={providers}
+                onAdd={handleAddProvider}
+                onEdit={handleEditProvider}
+                onRefresh={loadData}
+              />
             </div>
+          )}
 
-            <div className="px-6 py-5 space-y-5">
-              {/* Default Provider */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">Default Storage Provider</label>
-                <select
-                  value={draftSettings.default_provider_id}
-                  onChange={(e) => setDraftSettings((d) => ({ ...d, default_provider_id: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— None (use SharePoint settings) —</option>
-                  {providers.filter((p) => p.enabled).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {PROVIDER_META[p.provider_type].label} — {p.name}
-                      {p.is_default ? " ★" : ""}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">The provider used when no specific provider is selected for an upload.</p>
-              </div>
-
-              {/* Toggles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="flex items-center justify-between gap-4 bg-slate-50 rounded-xl px-4 py-3 cursor-pointer select-none">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Auto-create Folder Structure</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Automatically create company/module folders on the provider.</p>
-                  </div>
-                  <div
-                    onClick={() => setDraftSettings((d) => ({ ...d, auto_create_folder_structure: !d.auto_create_folder_structure }))}
-                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${draftSettings.auto_create_folder_structure ? "bg-blue-600" : "bg-slate-200"}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${draftSettings.auto_create_folder_structure ? "left-6" : "left-1"}`} />
-                  </div>
-                </label>
-
-                <label className="flex items-center justify-between gap-4 bg-slate-50 rounded-xl px-4 py-3 cursor-pointer select-none">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Enable External Sharing</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Allow generating shareable links for files.</p>
-                  </div>
-                  <div
-                    onClick={() => setDraftSettings((d) => ({ ...d, enable_external_sharing: !d.enable_external_sharing }))}
-                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${draftSettings.enable_external_sharing ? "bg-blue-600" : "bg-slate-200"}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${draftSettings.enable_external_sharing ? "left-6" : "left-1"}`} />
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section B: Storage Providers Table ──────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-800">Registered Providers</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{providers.length} provider{providers.length !== 1 ? "s" : ""} configured.</p>
-              </div>
-            </div>
-
-            {providers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="p-4 bg-slate-100 rounded-2xl mb-4">
-                  <HardDrive className="h-10 w-10 text-slate-300" />
-                </div>
-                <p className="text-sm font-medium text-slate-600">No storage providers configured</p>
-                <p className="text-xs text-slate-400 mt-1">Click <strong>Add Provider</strong> to register your first storage backend.</p>
-                <button onClick={() => { setEditProvider(null); setShowModal(true); }}
-                  className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">
-                  <Plus className="h-4 w-4" /> Add Provider
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-500 uppercase tracking-wide">
-                      <th className="px-6 py-3 text-left">Name / Provider</th>
-                      <th className="px-6 py-3 text-left">Status</th>
-                      <th className="px-6 py-3 text-left">Default</th>
-                      <th className="px-6 py-3 text-left">Created</th>
-                      <th className="px-6 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {providers.map((p) => {
-                      const meta = PROVIDER_META[p.provider_type];
-                      return (
-                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                          {/* Name / Provider */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${meta.bg} ${meta.color}`}>{meta.icon}</div>
-                              <div>
-                                <p className="font-medium text-slate-800">{p.name}</p>
-                                <p className="text-xs text-slate-500">{meta.label}</p>
-                                {p.provider_identifier && (
-                                  <p className="text-xs text-slate-400 font-mono mt-0.5">{p.provider_identifier}</p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                              p.enabled
-                                ? "bg-green-100 text-green-700"
-                                : "bg-slate-100 text-slate-500"
-                            }`}>
-                              {p.enabled ? <CheckCircle className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
-                              {p.enabled ? "Active" : "Disabled"}
-                            </span>
-                          </td>
-
-                          {/* Default */}
-                          <td className="px-6 py-4">
-                            {p.is_default ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                <Star className="h-3 w-3" /> Default
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-400">—</span>
-                            )}
-                          </td>
-
-                          {/* Created */}
-                          <td className="px-6 py-4 text-xs text-slate-500">
-                            {new Date(p.created_at).toLocaleDateString()}
-                          </td>
-
-                          {/* Actions */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Test */}
-                              <button
-                                title="Test Connection"
-                                onClick={() => handleTestConnection(p)}
-                                disabled={testingId === p.id}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
-                              >
-                                {testingId === p.id
-                                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                                  : <Zap className="h-4 w-4" />}
-                              </button>
-
-                              {/* Set Default */}
-                              {!p.is_default && (
-                                <button
-                                  title="Set as Default"
-                                  onClick={() => handleSetDefault(p)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                >
-                                  <StarOff className="h-4 w-4" />
-                                </button>
-                              )}
-
-                              {/* Edit */}
-                              <button
-                                title="Edit"
-                                onClick={() => { setEditProvider(p); setShowModal(true); }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-
-                              {/* Enable / Disable */}
-                              <button
-                                title={p.enabled ? "Disable" : "Enable"}
-                                onClick={() => handleToggle(p)}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  p.enabled
-                                    ? "text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                    : "text-slate-400 hover:text-green-600 hover:bg-green-50"
-                                }`}
-                              >
-                                {p.enabled ? <Ban className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Test result banner */}
-            {testResult && (
-              <div className={`mx-4 mb-4 flex items-start gap-2 px-4 py-3 rounded-xl text-sm border ${
-                testResult.ok
-                  ? "bg-green-50 border-green-200 text-green-700"
-                  : "bg-red-50 border-red-200 text-red-700"
-              }`}>
-                {testResult.ok
-                  ? <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  : <XCircle className="h-4 w-4 shrink-0 mt-0.5" />}
-                <div>
-                  <p className="font-medium">{testResult.ok ? "Connection OK" : "Connection Failed"}</p>
-                  <p className="text-xs mt-0.5 opacity-80">{testResult.message}</p>
-                </div>
-                <button onClick={() => setTestResult(null)} className="ml-auto text-inherit opacity-60 hover:opacity-100">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── Architecture Overview ────────────────────────────────── */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Provider Status</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(Object.entries(PROVIDER_META) as [ProviderType, typeof PROVIDER_META[ProviderType]][]).map(([type, meta]) => (
-                <div key={type} className={`rounded-xl p-3 border ${IMPLEMENTED.has(type) ? "border-green-200 bg-green-50" : "border-slate-200 bg-white"}`}>
-                  <div className={`${meta.color} mb-1.5`}>{meta.icon}</div>
-                  <p className="text-xs font-semibold text-slate-700">{meta.label}</p>
-                  <p className={`text-xs mt-0.5 ${IMPLEMENTED.has(type) ? "text-green-600" : "text-amber-600"}`}>
-                    {IMPLEMENTED.has(type) ? "Available" : "Coming soon"}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-slate-500 pt-1">
-              All providers share the same interface. Google Drive is fully available. AWS S3 and Azure Blob support will be enabled in upcoming phases.
-            </p>
-          </div>
+          {/* ── Help tab ──────────────────────────────────── */}
+          {tab === "help" && <StorageHelpTab />}
         </>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <ProviderModal
-          editProvider={editProvider}
-          onClose={() => { setShowModal(false); setEditProvider(null); }}
-          onSaved={() => { setShowModal(false); setEditProvider(null); load(); }}
+      {/* ── Modals ────────────────────────────────────────── */}
+      {showTypeSelector && (
+        <ProviderTypeSelector
+          onSelect={handleTypeSelected}
+          onClose={() => setShowTypeSelector(false)}
         />
       )}
+
+      {showModal && selectedType && (
+        <StorageProviderModal
+          providerType={selectedType}
+          editProvider={editProvider}
+          onClose={handleModalClose}
+          onSaved={handleModalSaved}
+        />
+      )}
+
     </div>
   );
 }

@@ -1,0 +1,397 @@
+```text id="storageuirefactorprompt"
+Refactor the existing Storage Providers UI in NEXTAPP-CLEAN into a clean enterprise architecture.
+
+DO NOT break any existing functionality.
+
+Current functionality already exists:
+- StorageProvider model
+- CompanyStorageSettings
+- SharePoint provider
+- Google Drive provider
+- Storage APIs
+- Provider CRUD
+- Upload integrations
+
+The problem:
+Current UI is becoming fragmented and provider-specific.
+
+====================================================
+GOAL
+====================================================
+
+Refactor into:
+
+✔ Single Storage Providers page
+✔ Dynamic provider modals
+✔ Provider tabs
+✔ Help tab
+✔ Reusable provider field components
+
+Architecture should match:
+Authentication Settings UI pattern.
+
+====================================================
+FINAL UI STRUCTURE
+====================================================
+
+Admin
+ └── Storage Providers
+
+Single page only.
+
+NO separate provider menus/pages.
+
+====================================================
+PAGE LAYOUT
+====================================================
+
+Top tabs:
+
+[ Providers ]
+[ Help ]
+
+====================================================
+TAB 1 — PROVIDERS
+====================================================
+
+Contains:
+
+SECTION A:
+Company Storage Settings
+
+SECTION B:
+Storage Providers Table
+
+====================================================
+SECTION A — COMPANY STORAGE SETTINGS
+====================================================
+
+Create top settings card.
+
+Fields:
+
+- Default Storage Provider
+- Auto Create Folder Structure
+- Enable External Sharing
+
+Use existing APIs/settings.
+
+====================================================
+SECTION B — STORAGE PROVIDERS TABLE
+====================================================
+
+Single unified table.
+
+Columns:
+- Provider Name
+- Provider Type
+- Status
+- Default
+- Created Date
+- Actions
+
+Actions:
+- Edit
+- Disable
+- Test Connection
+- Set Default
+
+NO provider-specific pages.
+
+====================================================
+ADD PROVIDER FLOW
+====================================================
+
+Single button:
+
+[ + Add Storage Provider ]
+
+On click:
+Open provider type selector modal.
+
+====================================================
+PROVIDER TYPE SELECTOR MODAL
+====================================================
+
+Modal title:
+Select Storage Provider
+
+Options:
+- SharePoint
+- Google Drive
+- AWS S3
+- Azure Blob
+
+After selection:
+Open dynamic provider configuration modal.
+
+====================================================
+DYNAMIC PROVIDER CONFIG MODAL
+====================================================
+
+Create reusable modal:
+
+StorageProviderModal
+
+Requirements:
+- Dynamically render fields based on provider type
+- Create mode
+- Edit mode
+- Responsive
+- Dark/light theme support
+
+====================================================
+CREATE REUSABLE FIELD COMPONENTS
+====================================================
+
+Create folder:
+
+/components/storage/provider-fields/
+
+Components:
+
+- sharepoint-fields.tsx
+- google-drive-fields.tsx
+- aws-s3-fields.tsx
+- azure-blob-fields.tsx
+
+====================================================
+SHAREPOINT FIELDS
+====================================================
+
+Fields:
+
+- Provider Name
+- Tenant ID
+- Client ID
+- Client Secret
+- Site ID
+- Drive ID
+- Root Folder
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+GOOGLE DRIVE FIELDS
+====================================================
+
+Fields:
+
+- Provider Name
+- Client ID
+- Client Secret
+- Refresh Token
+- Drive ID
+- Root Folder ID
+- Use Shared Drive
+
+Buttons:
+- Connect Google
+- Test Connection
+- Save
+
+====================================================
+AWS S3 FIELDS
+====================================================
+
+Fields:
+
+- Provider Name
+- Region
+- Bucket Name
+- Access Key
+- Secret Key
+- Root Prefix
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+AZURE BLOB FIELDS
+====================================================
+
+Fields:
+
+- Provider Name
+- Storage Account
+- Container Name
+- Access Key
+- Root Path
+
+Buttons:
+- Test Connection
+- Save
+
+====================================================
+CREATE REUSABLE STORAGE COMPONENTS
+====================================================
+
+Create:
+
+/components/storage/
+
+Files:
+
+- storage-provider-table.tsx
+- storage-provider-modal.tsx
+- provider-type-selector.tsx
+- storage-settings-card.tsx
+- storage-help-tab.tsx
+
+====================================================
+HELP TAB
+====================================================
+
+Create:
+[ Help ] tab
+
+Use accordion/cards.
+
+Sections:
+
+1. SharePoint Setup
+2. Google Drive Setup
+3. AWS S3 Setup
+4. Azure Blob Setup
+
+====================================================
+HELP TAB — SHAREPOINT GUIDE
+====================================================
+
+Explain:
+- Azure App Registration
+- Graph permissions
+- Site permissions
+- Redirect URL
+- Required fields
+
+====================================================
+HELP TAB — GOOGLE DRIVE GUIDE
+====================================================
+
+Explain:
+- Google Cloud Console
+- OAuth setup
+- Shared Drive setup
+- Required scopes
+- Callback URLs
+
+====================================================
+HELP TAB — AWS S3 GUIDE
+====================================================
+
+Explain:
+- Bucket creation
+- IAM user
+- Access keys
+- Region
+- Bucket permissions
+
+====================================================
+HELP TAB — AZURE BLOB GUIDE
+====================================================
+
+Explain:
+- Storage account
+- Container
+- Access keys
+- SAS tokens
+- Blob permissions
+
+====================================================
+MODAL ARCHITECTURE
+====================================================
+
+Use dynamic rendering.
+
+Example:
+
+switch(providerType) {
+  case "SHAREPOINT":
+    return <SharePointFields />
+}
+
+====================================================
+API INTEGRATION
+====================================================
+
+Reuse existing APIs.
+
+DO NOT duplicate APIs.
+
+Use:
+- existing provider CRUD
+- existing settings APIs
+- existing test connection APIs
+
+====================================================
+SECURITY REQUIREMENTS
+====================================================
+
+- Mask secrets on edit
+- Never expose secrets
+- Validate ownership
+- Validate provider type
+- Company isolation
+
+====================================================
+THEME REQUIREMENTS
+====================================================
+
+Must fully support:
+- Dark mode
+- Light mode
+- Existing branding engine
+
+Fix:
+- hidden text issues
+- dark header visibility
+
+====================================================
+RESPONSIVE REQUIREMENTS
+====================================================
+
+UI must work on:
+- desktop
+- tablet
+- mobile
+
+====================================================
+IMPORTANT RULES
+====================================================
+
+- DO NOT create separate provider pages
+- DO NOT create provider-specific menus
+- DO NOT break existing providers
+- DO NOT break upload functionality
+- DO NOT break SharePoint integration
+- DO NOT break Google Drive integration
+
+====================================================
+FINAL VALIDATION
+====================================================
+
+After implementation:
+
+- Existing providers work
+- Existing uploads work
+- Dynamic modals work
+- Help tab works
+- Dark/light themes work
+- No TS errors
+- App boots cleanly
+
+====================================================
+OUTPUT
+====================================================
+
+At completion provide:
+- Files created
+- Components created
+- Refactor summary
+- Dynamic modal architecture summary
+- UI structure summary
+```
