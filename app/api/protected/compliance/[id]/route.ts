@@ -33,13 +33,13 @@ export async function PATCH(
 
     await prisma.auditLog.create({
       data: {
-        company_id: companyId,
-        user_id: userId,
-        action_type: "UPDATE_STATUS",
-        module: "COMPLIANCE",
-        record_id: id,
-        old_value: existing as any,
-        new_value: updated as any,
+        company_id:  companyId,
+        user_id:     userId,
+        action:      "UPDATE_STATUS",
+        module:      "COMPLIANCE",
+        entity_type: "compliance",
+        entity_id:   id,
+        description: `Updated compliance status to ${status_id}`,
       },
     });
 

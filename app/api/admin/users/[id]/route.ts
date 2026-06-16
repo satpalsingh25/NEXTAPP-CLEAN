@@ -91,7 +91,7 @@ export async function PUT(
         ...(body.department_id !== undefined ? { department_id: (body.department_id as string) || null } : {}),
         ...(body.function_id   !== undefined ? { function_id:   (body.function_id as string)   || null } : {}),
         ...(body.group_id      !== undefined ? { group_id:      (body.group_id as string)      || null } : {}),
-      },
+      } as any,
       select: USER_SELECT,
     });
 

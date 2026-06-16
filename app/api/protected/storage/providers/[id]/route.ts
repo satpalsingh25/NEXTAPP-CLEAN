@@ -32,8 +32,8 @@ function encryptGDCredentials(
   providerType: string,
   incoming:     Record<string, unknown> | null | undefined,
   existing:     Record<string, unknown> | null | undefined,
-): Record<string, unknown> | null {
-  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? null;
+): Record<string, unknown> | undefined {
+  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? undefined;
   const { client_secret, refresh_token, ...rest } = incoming;
   const out: Record<string, unknown> = { ...rest };
   if (typeof client_secret === "string" && client_secret) {
@@ -89,11 +89,11 @@ export async function PUT(
       where: { id },
       data: {
         name:               name?.trim()              ?? existing.name,
-        configuration_json: encryptGDCredentials(
+        configuration_json: (encryptGDCredentials(
           existing.provider_type,
           configuration_json !== undefined ? configuration_json : null,
           existing.configuration_json as Record<string, unknown> | null,
-        ) ?? existing.configuration_json,
+        ) ?? existing.configuration_json) as never,
         provider_identifier: provider_identifier !== undefined
           ? (provider_identifier?.trim() || null)
           : existing.provider_identifier,

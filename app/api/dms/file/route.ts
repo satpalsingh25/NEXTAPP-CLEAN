@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       if (download) {
         void logAudit({ company_id, user_id: auth.user.user_id, action: "DOWNLOAD_FILE", module: "DMS", entity_type: "file", entity_id: doc.id, description: `Downloaded ${doc.name}` });
       }
-      return new NextResponse(provResult.buffer, {
+      return new NextResponse(new Uint8Array(provResult.buffer), {
         status: 200,
         headers: {
           "Content-Type":        provResult.mimeType,

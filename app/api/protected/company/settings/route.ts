@@ -43,13 +43,13 @@ export async function PUT(req: NextRequest) {
 
   await prisma.auditLog.create({
     data: {
-      company_id: companyId,
-      user_id: userId,
-      action_type: "UPDATE_BRANDING",
-      module: "COMPLIANCE",
-      record_id: companyId,
-      old_value: oldData as any,
-      new_value: updated as any,
+      company_id:  companyId,
+      user_id:     userId,
+      action:      "UPDATE_BRANDING",
+      module:      "ADMIN",
+      entity_type: "company",
+      entity_id:   companyId,
+      description: "Updated company branding settings",
     },
   });
 

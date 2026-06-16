@@ -26,12 +26,13 @@ export async function POST(req: NextRequest) {
 
     await prisma.auditLog.create({
       data: {
-        company_id: companyId,
-        user_id: userId,
-        action_type: "CREATE",
-        module: "COMPLIANCE",
-        record_id: compliance.id,
-        new_value: compliance as any,
+        company_id:  companyId,
+        user_id:     userId,
+        action:      "CREATE",
+        module:      "COMPLIANCE",
+        entity_type: "compliance",
+        entity_id:   compliance.id,
+        description: `Created compliance record`,
       },
     });
 

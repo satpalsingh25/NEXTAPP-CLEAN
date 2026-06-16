@@ -100,7 +100,7 @@ export async function GET(
         entity_id:   doc.id,
         description: `Downloaded ${filename}`,
       });
-      return new NextResponse(provResult.buffer, {
+      return new NextResponse(new Uint8Array(provResult.buffer), {
         status: 200,
         headers: {
           "Content-Type":        provResult.mimeType,

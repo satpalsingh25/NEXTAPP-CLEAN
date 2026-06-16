@@ -45,8 +45,8 @@ function encryptGDCredentials(
   providerType:   string,
   incoming:       Record<string, unknown> | null | undefined,
   existing:       Record<string, unknown> | null | undefined,
-): Record<string, unknown> | null {
-  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? null;
+): Record<string, unknown> | undefined {
+  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? undefined;
 
   const { client_secret, refresh_token, ...rest } = incoming;
   const out: Record<string, unknown> = { ...rest };
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         company_id,
         name:               name.trim(),
         provider_type,
-        configuration_json: encryptGDCredentials(provider_type, configuration_json, null),
+        configuration_json: encryptGDCredentials(provider_type, configuration_json, null) as never,
         provider_identifier: provider_identifier?.trim() || null,
         is_default:         is_default ?? false,
         enabled:            true,

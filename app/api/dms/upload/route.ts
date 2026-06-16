@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
   for (const file of rawFiles) {
     const filename = file.name;
 
-    let uploadResult: { fileId: string; webUrl: string; driveId: string; filePath: string };
+    let uploadResult: { fileId: string; webUrl: string; driveId: string; filePath: string; storage_provider_id: string | null };
     try {
       uploadResult = await uploadDmsFile({
         companyId:  company_id,

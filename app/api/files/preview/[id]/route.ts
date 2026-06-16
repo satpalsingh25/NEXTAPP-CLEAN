@@ -100,7 +100,7 @@ export async function GET(
         description: `Previewed ${filename}`,
       });
       const contentType = provResult.mimeType || mimeFromName(filename);
-      return new NextResponse(provResult.buffer, {
+      return new NextResponse(new Uint8Array(provResult.buffer), {
         status: 200,
         headers: {
           "Content-Type":        contentType,

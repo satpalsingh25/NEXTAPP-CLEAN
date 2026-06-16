@@ -104,7 +104,7 @@ export async function ensureSharePointProviderRegistered(
 
   await prisma.auditLog.create({
     data: {
-      company_id,
+      company_id:  companyId,
       action:      "STORAGE_PROVIDER_AUTO_CREATE",
       module:      "STORAGE",
       entity_type: "StorageProvider",

@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     ).catch(() => null);
 
     if (provResult) {
-      return new NextResponse(provResult.buffer, {
+      return new NextResponse(new Uint8Array(provResult.buffer), {
         status: 200,
         headers: {
           "Content-Type":        provResult.mimeType,

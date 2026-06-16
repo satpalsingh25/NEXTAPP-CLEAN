@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "node_modules/.bin/next dev -p 5000 -H 0.0.0.0",
-    "build": "next build",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start -p 5000 -H 0.0.0.0",
     "check": "tsc",
     "db:push": "prisma db push",

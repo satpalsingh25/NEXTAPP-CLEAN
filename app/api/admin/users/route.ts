@@ -1,4 +1,5 @@
 import { prisma }          from "@/lib/prisma";
+import { Role }            from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt              from "bcryptjs";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
         email,
         name:                body.name as string || null,
         password_hash:       hashedPassword,
-        role:                (body.role as string) || "USER",
+        role:                (((body.role as string) || "USER") as Role),
         company_id,
         is_active:           true,
         must_reset_password: (body.must_reset_password as boolean) ?? false,
