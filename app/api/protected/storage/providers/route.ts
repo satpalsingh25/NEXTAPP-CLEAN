@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma }                      from "@/lib/prisma";
+import { Prisma }                      from "@prisma/client";
 import { requireRole, ADMIN_ONLY }     from "@/lib/auth.server";
 import {
   errorResponse, successResponse, generateRequestId,
@@ -45,8 +46,10 @@ function encryptGDCredentials(
   providerType:   string,
   incoming:       Record<string, unknown> | null | undefined,
   existing:       Record<string, unknown> | null | undefined,
-): Record<string, unknown> | undefined {
-  if (providerType !== "GOOGLE_DRIVE" || !incoming) return incoming ?? undefined;
+): Prisma.InputJsonValue | undefined {
+  if (providerType !== "GOOGLE_DRIVE" || !incoming) {
+    return incoming != null ? (incoming as Prisma.InputJsonValue) : undefined;
+  }
 
   const { client_secret, refresh_token, ...rest } = incoming;
   const out: Record<string, unknown> = { ...rest };
@@ -64,7 +67,7 @@ function encryptGDCredentials(
     out.refresh_token_enc = encryptPassword(refresh_token);
   }
 
-  return out;
+  return out as Prisma.InputJsonValue;
 }
 
 const SAFE_SELECT = {
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
         company_id,
         name:               name.trim(),
         provider_type,
-        configuration_json: encryptGDCredentials(provider_type, configuration_json, null) as never,
+        configuration_json: encryptGDCredentials(provider_type, configuration_json, null),
         provider_identifier: provider_identifier?.trim() || null,
         is_default:         is_default ?? false,
         enabled:            true,

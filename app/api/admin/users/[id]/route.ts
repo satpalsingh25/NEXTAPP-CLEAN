@@ -1,4 +1,5 @@
 import { prisma }          from "@/lib/prisma";
+import { Prisma, Role }   from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, ADMIN_ONLY } from "@/lib/auth.server";
 import { logAudit }        from "@/lib/audit-log";
@@ -81,17 +82,18 @@ export async function PUT(
       throw e;
     }
 
+    const updateData: Prisma.UserUncheckedUpdateInput = {};
+    if (body.name        !== undefined) updateData.name          = (body.name as string) || null;
+    if (body.email)                     updateData.email         = body.email as string;
+    if (body.role)                      updateData.role          = body.role as Role;
+    if (body.company_id)                updateData.company_id    = body.company_id as string;
+    if (body.department_id !== undefined) updateData.department_id = (body.department_id as string) || null;
+    if (body.function_id   !== undefined) updateData.function_id   = (body.function_id as string)   || null;
+    if (body.group_id      !== undefined) updateData.group_id      = (body.group_id as string)      || null;
+
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        ...(body.name !== undefined         ? { name: (body.name as string) || null }         : {}),
-        ...(body.email                      ? { email: body.email as string }                 : {}),
-        ...(body.role                       ? { role: body.role as string }                   : {}),
-        ...(body.company_id                 ? { company_id: body.company_id as string }       : {}),
-        ...(body.department_id !== undefined ? { department_id: (body.department_id as string) || null } : {}),
-        ...(body.function_id   !== undefined ? { function_id:   (body.function_id as string)   || null } : {}),
-        ...(body.group_id      !== undefined ? { group_id:      (body.group_id as string)      || null } : {}),
-      } as any,
+      data:  updateData,
       select: USER_SELECT,
     });
 
